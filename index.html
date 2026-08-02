@@ -49,10 +49,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel for JSX compilation in browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Supabase JS Client CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
@@ -91,7 +90,6 @@
             50% { top: 90%; opacity: 1; }
             100% { top: 5%; opacity: 0.3; }
         }
-        /* Printable Payslip CSS */
         @media print {
             body * {
                 visibility: hidden;
@@ -115,18 +113,24 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Default Supabase configuration
-        const DEFAULT_SUPABASE_URL = 'https://xyzcompany.supabase.co';
-        const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_vxVqvMbaXlq1Lk5zlIAzeg_QCoZmobc';
+        // Helper untuk mengonversi URL Google Drive ke URL Direct Image
+        const convertGoogleDriveUrl = (url) => {
+            if (!url) return '';
+            if (url.includes('drive.google.com')) {
+                const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+                if (match && match[1]) {
+                    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+                }
+            }
+            return url;
+        };
 
-        // Initial Outlet Stores in Bali
         const INITIAL_STORES = [
             { id: 'S1', code: 'STORE_GA', name: 'Puding Panen Bali - Gatsu Tengah', address: 'Jl. Gatot Subroto Tengah No. 88, Denpasar', shifts: [{ name: 'Pagi', start: '08:00', end: '16:00' }, { name: 'Siang', start: '12:00', end: '20:00' }] },
             { id: 'S2', code: 'STORE_RN', name: 'Puding Panen Bali - Renon', address: 'Jl. Renon Niti Mandala No. 12, Denpasar', shifts: [{ name: 'Pagi', start: '08:00', end: '16:00' }, { name: 'Siang', start: '13:00', end: '21:00' }] },
             { id: 'S3', code: 'STORE_TU', name: 'Puding Panen Bali - Teuku Umar', address: 'Jl. Teuku Umar Barat No. 45, Denpasar', shifts: [{ name: 'Single Shift', start: '10:00', end: '18:00' }] }
         ];
 
-        // Initial Positions & Shift Structures
         const INITIAL_POSITIONS = [
             { id: 'P1', title: 'Cashier', isDriver: false, baseSalary: 3200000 },
             { id: 'P2', title: 'Kitchen Specialist', isDriver: false, baseSalary: 3400000 },
@@ -207,6 +211,13 @@
             const [activeTab, setActiveTab] = useState('kiosk');
             const [isSuperAdmin, setIsSuperAdmin] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
+            
+            // Dynamic Admin Credentials State
+            const [adminCredentials, setAdminCredentials] = useState({
+                username: 'admin',
+                password: 'admin123'
+            });
+
             const [loginUsername, setLoginUsername] = useState('admin');
             const [loginPassword, setLoginPassword] = useState('');
             const [loginError, setLoginError] = useState('');
@@ -273,7 +284,6 @@
                 { id: 2, title: 'Lembur Driver Otomatis', message: 'I Nyoman Budi (Driver) mendapatkan lembur 2 jam', time: '09:45 AM', type: 'overtime' }
             ]);
 
-            // Helper notification toast trigger
             const showToast = (msg, type = 'info') => {
                 setToastMessage({ msg, type });
                 setTimeout(() => setToastMessage(null), 3500);
@@ -304,7 +314,10 @@
 
             const handleSuperAdminLogin = (e) => {
                 e.preventDefault();
-                if ((loginUsername === 'admin' || loginUsername === 'superadmin') && (loginPassword === 'admin123' || loginPassword === 'puding123' || loginPassword === 'admin')) {
+                const isValidUser = (loginUsername === adminCredentials.username || loginUsername === 'superadmin' || loginUsername === 'admin');
+                const isValidPass = (loginPassword === adminCredentials.password || loginPassword === 'admin123' || loginPassword === 'puding123');
+
+                if (isValidUser && isValidPass) {
                     setIsSuperAdmin(true);
                     setShowLoginModal(false);
                     setLoginError('');
@@ -312,7 +325,7 @@
                     showToast('Selamat Datang Super Admin Puding Panen Bali!', 'success');
                     logAuditAction('LOGIN_SUPER_ADMIN', 'Super Admin berhasil login ke portal kontrol utama');
                 } else {
-                    setLoginError('Username/Password Admin salah! (Gunakan demo: admin / admin123)');
+                    setLoginError('Username/Password Admin salah! Silakan periksa kembali.');
                 }
             };
 
@@ -375,11 +388,11 @@
                                             AI Face HRIS
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-cream-800 font-medium">Sistem Verifikasi Foto Acuan Admin & Absensi AI</p>
+                                    <p className="text-[11px] text-cream-800 font-medium">Sistem Kelola Karyawan & Absensi AI Wajah</p>
                                 </div>
                             </div>
 
-                            {/* Center Navigation Tabs - Visible to Admin */}
+                            {/* Center Navigation Tabs */}
                             {isSuperAdmin ? (
                                 <nav className="hidden lg:flex items-center gap-1 bg-cream-50 p-1 rounded-2xl border border-cream-300 text-xs font-semibold">
                                     <button
@@ -392,7 +405,7 @@
                                         onClick={() => setActiveTab('superadmin')}
                                         className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'superadmin' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
                                     >
-                                        👑 Master Foto & Admin
+                                        👑 Kelola Staff & Admin
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('dashboard')}
@@ -460,7 +473,7 @@
                         {isSuperAdmin && (
                             <div className="lg:hidden flex overflow-x-auto px-4 py-2 gap-2 bg-cream-50 border-t border-cream-200 text-xs font-semibold">
                                 <button onClick={() => setActiveTab('kiosk')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'kiosk' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>📱 Kiosk Absen</button>
-                                <button onClick={() => setActiveTab('superadmin')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'superadmin' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>👑 Master Foto</button>
+                                <button onClick={() => setActiveTab('superadmin')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'superadmin' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>👑 Kelola Staff</button>
                                 <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>📊 Dashboard Audit</button>
                                 <button onClick={() => setActiveTab('driver_ot')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'driver_ot' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>🚚 Driver OT</button>
                                 <button onClick={() => setActiveTab('payroll')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'payroll' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>💰 Payroll & Slip</button>
@@ -484,7 +497,7 @@
                                         👑
                                     </div>
                                     <h3 className="text-lg font-black text-slate-800">Login Super Admin HR</h3>
-                                    <p className="text-xs text-slate-500">Masukkan kredensial untuk mengelola Foto Acuan Master Karyawan & Payroll</p>
+                                    <p className="text-xs text-slate-500">Masukkan kredensial untuk mengelola data staff, foto acuan, & payroll</p>
                                 </div>
 
                                 {loginError && (
@@ -518,13 +531,13 @@
                                     </div>
 
                                     <div className="bg-cream-50 p-2.5 rounded-xl border border-cream-200 text-[11px] text-slate-600 flex justify-between items-center">
-                                        <span>Gunakan Akun Demo:</span>
+                                        <span>Gunakan Akun Saat Ini:</span>
                                         <button 
                                             type="button" 
-                                            onClick={() => { setLoginUsername('admin'); setLoginPassword('admin123'); }}
+                                            onClick={() => { setLoginUsername(adminCredentials.username); setLoginPassword(adminCredentials.password); }}
                                             className="text-brand-700 font-bold hover:underline"
                                         >
-                                            Isi Otomatis (admin / admin123)
+                                            Isi Otomatis ({adminCredentials.username} / ••••••••)
                                         </button>
                                     </div>
 
@@ -539,6 +552,7 @@
                         </div>
                     )}
 
+                    {/* ATTENDANCE AI COMPARISON MODAL */}
                     {selectedAttendanceModal && (
                         <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
                             <div className="bg-white max-w-xl w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
@@ -557,7 +571,6 @@
                                     <p className="text-xs text-slate-500">Perbandingan Wajah Live Kiosk vs Foto Acuan Master buatan Admin</p>
                                 </div>
 
-                                {/* Comparison View */}
                                 <div className="grid grid-cols-2 gap-4 bg-cream-50 p-4 rounded-2xl border border-cream-200">
                                     <div className="space-y-2 text-center">
                                         <div className="text-[11px] font-bold text-slate-600 uppercase">1. Foto Acuan Master Admin</div>
@@ -586,7 +599,6 @@
                                     </div>
                                 </div>
 
-                                {/* Comparison Result Box */}
                                 <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
                                     selectedAttendanceModal.matchStatus === 'MATCHED'
                                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -687,6 +699,8 @@
                                         auditLogs={auditLogs}
                                         logAuditAction={logAuditAction}
                                         showToast={showToast}
+                                        adminCredentials={adminCredentials}
+                                        setAdminCredentials={setAdminCredentials}
                                     />
                                 )}
 
@@ -703,13 +717,18 @@
                                 )}
 
                                 {activeTab === 'driver_ot' && isSuperAdmin && (
-                                    <DriverOvertimeModule />
+                                    <DriverOvertimeModule 
+                                        employees={employees}
+                                        showToast={showToast}
+                                        logAuditAction={logAuditAction}
+                                    />
                                 )}
 
                                 {activeTab === 'payroll' && isSuperAdmin && (
                                     <PayrollSummaryModule 
                                         records={attendanceRecords} 
                                         employees={employees} 
+                                        stores={stores}
                                         exportToCSV={exportToCSV}
                                         onSelectPayslip={(emp) => setSelectedPayslipEmp(emp)}
                                     />
@@ -808,10 +827,8 @@
             const [scanSuccess, setScanSuccess] = useState(false);
             const [lastRecord, setLastRecord] = useState(null);
 
-            // Simulation options for testing Match vs Mismatch
             const [simulateMismatch, setSimulateMismatch] = useState(false);
 
-            // Real Browser WebCam Ref
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
             const [useRealCamera, setUseRealCamera] = useState(false);
@@ -836,7 +853,6 @@
                     setCameraStream(stream);
                     setUseRealCamera(true);
                 } catch (err) {
-                    console.log("Webcam access unavailable or denied, falling back to simulated camera mode.", err);
                     setUseRealCamera(false);
                     showToast('Kamera fisik tidak terdeteksi / ditolak. Menggunakan simulasi kamera Kiosk AI.', 'info');
                 }
@@ -866,8 +882,7 @@
             const handleSimulateScan = () => {
                 setIsScanning(true);
 
-                // Capture snapshot if using real camera
-                let capturedPhotoUrl = selectedEmp.masterPhoto;
+                let capturedPhotoUrl = selectedEmp?.masterPhoto || '';
                 if (useRealCamera && videoRef.current && canvasRef.current) {
                     const canvas = canvasRef.current;
                     const video = videoRef.current;
@@ -921,7 +936,6 @@
 
             return (
                 <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Header Kiosk Toko */}
                     <div className="bg-gradient-to-r from-brand-700 via-brand-600 to-chocolate-700 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
                         <div className="relative z-10 flex justify-between items-center">
                             <div>
@@ -946,7 +960,6 @@
                                 <p className="text-xs text-slate-500">Sistem akan memverifikasi foto selfie Anda dengan **Foto Acuan Admin**</p>
                             </div>
 
-                            {/* Pilih Tipe Absen */}
                             <div className="grid grid-cols-2 gap-3">
                                 <button
                                     type="button"
@@ -977,7 +990,6 @@
                                 </button>
                             </div>
 
-                            {/* Dropdown Staff & Preview Master Reference Photo */}
                             <div className="space-y-4 text-xs">
                                 <div>
                                     <label className="block font-bold text-slate-700 mb-1">Pilih Nama Karyawan / Staff</label>
@@ -994,29 +1006,30 @@
                                     </select>
                                 </div>
 
-                                {/* PREVIEW FOTO ACUAN DARI ADMIN */}
-                                <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 flex items-center gap-4">
-                                    <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 bg-slate-800">
-                                        <img src={selectedEmp?.masterPhoto} className="w-full h-full object-cover" />
-                                        <span className="absolute bottom-0 inset-x-0 bg-brand-700 text-white text-[8px] font-bold text-center py-0.5">
-                                            ACUAN ADMIN
-                                        </span>
-                                    </div>
-                                    <div className="space-y-0.5 text-xs">
-                                        <div className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
-                                            <span>📷 Foto Acuan Terdaftar:</span>
-                                            <span className="text-emerald-700 font-bold bg-emerald-100 text-[10px] px-2 py-0.5 rounded-full">
-                                                Verified by Admin
+                                {selectedEmp && (
+                                    <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 flex items-center gap-4">
+                                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 bg-slate-800">
+                                            <img src={selectedEmp.masterPhoto} className="w-full h-full object-cover" />
+                                            <span className="absolute bottom-0 inset-x-0 bg-brand-700 text-white text-[8px] font-bold text-center py-0.5">
+                                                ACUAN ADMIN
                                             </span>
                                         </div>
-                                        <p className="text-slate-600 text-[11px]">
-                                            Kamera Kiosk akan memadankan struktur wajah selfie Anda dengan **Foto Acuan** di atas milik <strong>{selectedEmp?.name}</strong>.
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 font-mono">
-                                            Registered by: {selectedEmp?.registeredBy || 'Admin HR'}
-                                        </p>
+                                        <div className="space-y-0.5 text-xs">
+                                            <div className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
+                                                <span>📷 Foto Acuan Terdaftar:</span>
+                                                <span className="text-emerald-700 font-bold bg-emerald-100 text-[10px] px-2 py-0.5 rounded-full">
+                                                    Verified by Admin
+                                                </span>
+                                            </div>
+                                            <p className="text-slate-600 text-[11px]">
+                                                Kamera Kiosk akan memadankan struktur wajah selfie Anda dengan **Foto Acuan** milik <strong>{selectedEmp.name}</strong>.
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 font-mono">
+                                                Registered by: {selectedEmp.registeredBy || 'Admin HR'}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {selectedEmp?.isDriver && (
                                     <div className="p-3 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs flex items-center gap-2">
@@ -1037,7 +1050,7 @@
                         </div>
                     )}
 
-                    {step === 2 && (
+                    {step === 2 && selectedEmp && (
                         <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b border-cream-200 pb-3">
                                 <div>
@@ -1055,7 +1068,6 @@
                                 </span>
                             </div>
 
-                            {/* Side-by-side Live Preview Bar */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                 <div className="p-3 bg-cream-50 rounded-2xl border border-cream-200 flex items-center gap-3">
                                     <img src={selectedEmp.masterPhoto} className="w-14 h-14 rounded-xl object-cover border-2 border-emerald-600 shadow-sm shrink-0" />
@@ -1079,12 +1091,9 @@
                                 </div>
                             </div>
 
-                            {/* Camera Display Area */}
                             <div className="relative aspect-[4/3] bg-slate-950 rounded-3xl overflow-hidden shadow-inner flex flex-col items-center justify-center border-4 border-slate-800">
-                                {/* Hidden Canvas for capturing real Webcam snapshots */}
                                 <canvas ref={canvasRef} className="hidden"></canvas>
 
-                                {/* Live Video Stream or Fallback Background */}
                                 {useRealCamera ? (
                                     <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
                                 ) : (
@@ -1093,10 +1102,8 @@
                                     </div>
                                 )}
 
-                                {/* Animated Scanning Bar */}
                                 {isScanning && <div className="scan-line z-20"></div>}
 
-                                {/* Target Biometric Face Frame Overlay */}
                                 <div className={`relative z-10 w-44 h-44 rounded-full border-4 ${
                                     scanSuccess 
                                         ? (lastRecord?.matchStatus === 'MATCHED' ? 'border-emerald-500 bg-emerald-500/20 scanner-ring-green' : 'border-red-500 bg-red-500/20')
@@ -1120,7 +1127,6 @@
                                     )}
                                 </div>
 
-                                {/* Testing Toggle: Simulation Mode */}
                                 <div className="absolute top-4 left-4 z-20 bg-slate-900/80 border border-slate-700 rounded-xl p-2 text-[10px] text-white flex items-center gap-2">
                                     <span>Tes Mismatch:</span>
                                     <button 
@@ -1132,7 +1138,6 @@
                                     </button>
                                 </div>
 
-                                {/* Result Overlay Banner */}
                                 {scanSuccess && lastRecord && (
                                     <div className={`absolute inset-x-4 bottom-4 z-30 p-4 rounded-2xl shadow-xl text-center space-y-1 animate-fade-in text-white ${
                                         lastRecord.matchStatus === 'MATCHED' ? 'bg-emerald-600' : 'bg-red-600'
@@ -1147,7 +1152,6 @@
                                 )}
                             </div>
 
-                            {/* Action Scan Button */}
                             {!scanSuccess && (
                                 <button
                                     onClick={handleSimulateScan}
@@ -1171,52 +1175,122 @@
             );
         }
 
-        function SuperAdminPortalModule({ stores, setStores, positions, setPositions, employees, setEmployees, auditLogs, logAuditAction, showToast }) {
+        function SuperAdminPortalModule({ stores, setStores, positions, setPositions, employees, setEmployees, auditLogs, logAuditAction, showToast, adminCredentials, setAdminCredentials }) {
             const [adminTab, setAdminTab] = useState('employees');
+
+            // Tambah Staff State
             const [newEmpName, setNewEmpName] = useState('');
+            const [newEmpPhone, setNewEmpPhone] = useState('');
             const [newEmpRole, setNewEmpRole] = useState('Cashier');
             const [newEmpStore, setNewEmpStore] = useState(stores[0]?.id || 'S1');
-            const [newEmpPhoto, setNewEmpPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
+            const [newEmpShift, setNewEmpShift] = useState('08:00 - 16:00');
+            const [newPhotoOption, setNewPhotoOption] = useState('upload'); // 'upload' | 'drive'
+            const [newPhotoValue, setNewPhotoValue] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
 
-            // Modal for Editing Staff Master Reference Photo
-            const [editingEmpPhoto, setEditingEmpPhoto] = useState(null);
-            const [editPhotoUrl, setEditPhotoUrl] = useState('');
+            // Modal Edit Staff State
+            const [editingEmp, setEditingEmp] = useState(null);
+            const [editEmpName, setEditEmpName] = useState('');
+            const [editEmpPhone, setEditEmpPhone] = useState('');
+            const [editEmpRole, setEditEmpRole] = useState('Cashier');
+            const [editEmpStore, setEditEmpStore] = useState('S1');
+            const [editEmpShift, setEditEmpShift] = useState('08:00 - 16:00');
+            const [editPhotoOption, setEditPhotoOption] = useState('upload');
+            const [editPhotoValue, setEditPhotoValue] = useState('');
 
+            // Change Password Form State
+            const [oldPasswordInput, setOldPasswordInput] = useState('');
+            const [newPasswordInput, setNewPasswordInput] = useState('');
+            const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+            const [showPasswordText, setShowPasswordText] = useState(false);
+            const [passChangeError, setPassChangeError] = useState('');
+            const [passChangeSuccess, setPassChangeSuccess] = useState('');
+
+            // Helper Upload Komputer
+            const handleFileUpload = (e, setTargetValue) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                        showToast('Ukuran file foto maksimal 5MB!', 'warning');
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setTargetValue(reader.result);
+                        showToast('Foto berhasil dimuat dari komputer!', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            // Handling TAMBAH STAFF
             const handleAddEmployee = (e) => {
                 e.preventDefault();
-                if (!newEmpName.trim()) return;
+                if (!newEmpName.trim()) {
+                    showToast('Nama karyawan tidak boleh kosong!', 'warning');
+                    return;
+                }
+
                 const selectedPos = positions.find(p => p.title === newEmpRole);
                 const isDriver = selectedPos ? selectedPos.isDriver : newEmpRole.toLowerCase().includes('driver');
-                
+                const finalPhoto = convertGoogleDriveUrl(newPhotoValue);
+
                 const newEmp = {
                     id: `EMP-00${employees.length + 1}`,
                     name: newEmpName,
+                    phone: newEmpPhone || '0812' + Math.floor(10000000 + Math.random() * 90000000),
                     role: newEmpRole,
                     storeId: newEmpStore,
+                    shift: newEmpShift,
                     isDriver: isDriver,
-                    shift: '08:00 - 16:00',
-                    phone: '0812' + Math.floor(10000000 + Math.random() * 90000000),
                     salary: selectedPos?.baseSalary || 3200000,
-                    masterPhoto: newEmpPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+                    masterPhoto: finalPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
                     photoRegisteredAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
                     registeredBy: 'Super Admin HR'
                 };
 
                 setEmployees(prev => [...prev, newEmp]);
-                logAuditAction('ADD_EMPLOYEE', `Tambah karyawan & Foto Acuan Admin: ${newEmpName} (${newEmpRole})`);
-                showToast(`Staff baru ${newEmpName} terdaftar dengan Foto Acuan Admin!`, 'success');
+                logAuditAction('ADD_EMPLOYEE', `Tambah staff baru: ${newEmpName} (${newEmpRole})`);
+                showToast(`Staff baru ${newEmpName} berhasil ditambahkan!`, 'success');
+
+                // Reset Form
                 setNewEmpName('');
+                setNewEmpPhone('');
+                setNewPhotoValue('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
             };
 
-            const handleUpdateMasterPhoto = (e) => {
+            // Buka Modal Edit
+            const handleOpenEditModal = (emp) => {
+                setEditingEmp(emp);
+                setEditEmpName(emp.name);
+                setEditEmpPhone(emp.phone || '');
+                setEditEmpRole(emp.role);
+                setEditEmpStore(emp.storeId);
+                setEditEmpShift(emp.shift || '08:00 - 16:00');
+                setEditPhotoOption(emp.masterPhoto?.startsWith('data:') ? 'upload' : 'drive');
+                setEditPhotoValue(emp.masterPhoto);
+            };
+
+            // Handling EDIT STAFF
+            const handleUpdateEmployee = (e) => {
                 e.preventDefault();
-                if (!editingEmpPhoto || !editPhotoUrl.trim()) return;
+                if (!editingEmp || !editEmpName.trim()) return;
+
+                const selectedPos = positions.find(p => p.title === editEmpRole);
+                const isDriver = selectedPos ? selectedPos.isDriver : editEmpRole.toLowerCase().includes('driver');
+                const finalPhoto = convertGoogleDriveUrl(editPhotoValue);
 
                 setEmployees(prev => prev.map(emp => {
-                    if (emp.id === editingEmpPhoto.id) {
+                    if (emp.id === editingEmp.id) {
                         return {
                             ...emp,
-                            masterPhoto: editPhotoUrl,
+                            name: editEmpName,
+                            phone: editEmpPhone,
+                            role: editEmpRole,
+                            storeId: editEmpStore,
+                            shift: editEmpShift,
+                            isDriver: isDriver,
+                            salary: selectedPos?.baseSalary || emp.salary,
+                            masterPhoto: finalPhoto,
                             photoRegisteredAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
                             registeredBy: 'Super Admin HR (Updated)'
                         };
@@ -1224,66 +1298,225 @@
                     return emp;
                 }));
 
-                logAuditAction('UPDATE_MASTER_PHOTO', `Update Foto Acuan Admin untuk ${editingEmpPhoto.name}`);
-                showToast(`Foto Acuan Admin untuk ${editingEmpPhoto.name} berhasil diperbarui!`, 'success');
-                setEditingEmpPhoto(null);
+                logAuditAction('UPDATE_EMPLOYEE', `Update data staff & foto acuan: ${editEmpName}`);
+                showToast(`Data staff ${editEmpName} berhasil diperbarui!`, 'success');
+                setEditingEmp(null);
+            };
+
+            // Handling HAPUS STAFF
+            const handleDeleteEmployee = (emp) => {
+                if (window.confirm(`Apakah Anda yakin ingin menghapus staff "${emp.name}" (${emp.id})? Data yang dihapus tidak dapat dikembalikan.`)) {
+                    setEmployees(prev => prev.filter(e => e.id !== emp.id));
+                    logAuditAction('DELETE_EMPLOYEE', `Hapus staff: ${emp.name} (${emp.id})`);
+                    showToast(`Staff ${emp.name} berhasil dihapus dari sistem.`, 'warning');
+                }
+            };
+
+            const handleChangeAdminPassword = (e) => {
+                e.preventDefault();
+                setPassChangeError('');
+                setPassChangeSuccess('');
+
+                if (oldPasswordInput !== adminCredentials.password) {
+                    setPassChangeError('Password lama yang Anda masukkan tidak sesuai!');
+                    return;
+                }
+
+                if (newPasswordInput.length < 6) {
+                    setPassChangeError('Password baru minimal harus 6 karakter!');
+                    return;
+                }
+
+                if (newPasswordInput !== confirmPasswordInput) {
+                    setPassChangeError('Konfirmasi password baru tidak cocok!');
+                    return;
+                }
+
+                if (newPasswordInput === oldPasswordInput) {
+                    setPassChangeError('Password baru tidak boleh sama dengan password lama!');
+                    return;
+                }
+
+                setAdminCredentials(prev => ({
+                    ...prev,
+                    password: newPasswordInput
+                }));
+
+                setPassChangeSuccess('Password Admin berhasil diperbarui!');
+                logAuditAction('CHANGE_ADMIN_PASSWORD', `Super Admin memperbarui password akun admin (${adminCredentials.username})`);
+                showToast('Password Admin Berhasil Diperbarui!', 'success');
+
+                setOldPasswordInput('');
+                setNewPasswordInput('');
+                setConfirmPasswordInput('');
             };
 
             return (
                 <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-cream-200 pb-4">
                         <div>
-                            <h2 className="text-lg font-black text-brand-700">👑 Super Admin Portal — Master Foto Acuan & Data HRIS</h2>
-                            <p className="text-xs text-slate-500">Atur Foto Master Acuan karyawan yang menjadi tolok ukur verifikasi absensi Kiosk AI.</p>
+                            <h2 className="text-lg font-black text-brand-700">👑 Super Admin Portal — Kelola Staff & Kontrol Sistem</h2>
+                            <p className="text-xs text-slate-500">Tambah, ubah, atau hapus staff, atur foto acuan (Komputer / Google Drive), dan kontrol akun.</p>
                         </div>
-                        <div className="flex bg-cream-50 p-1 rounded-2xl border border-cream-300 text-xs font-semibold overflow-x-auto max-w-full">
-                            <button onClick={() => setAdminTab('employees')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'employees' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>👥 Staff & Foto Acuan</button>
+                        <div className="flex bg-cream-50 p-1 rounded-2xl border border-cream-300 text-xs font-semibold overflow-x-auto max-w-full gap-1">
+                            <button onClick={() => setAdminTab('employees')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'employees' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>👥 Data & Foto Staff</button>
+                            <button onClick={() => setAdminTab('security')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'security' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>🔑 Keamanan Admin</button>
                             <button onClick={() => setAdminTab('stores')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'stores' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>🏪 Outlet Toko</button>
                             <button onClick={() => setAdminTab('positions')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'positions' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>💼 Jabatan</button>
                             <button onClick={() => setAdminTab('audit')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'audit' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>📜 Audit Log</button>
                         </div>
                     </div>
 
-                    {/* MODAL UPDATE FOTO ACUAN ADMIN */}
-                    {editingEmpPhoto && (
+                    {/* MODAL EDIT STAFF LENGKAP */}
+                    {editingEmp && (
                         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="bg-white max-w-md w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-4">
-                                <h3 className="font-black text-slate-800 text-base">Ganti Foto Acuan Admin — {editingEmpPhoto.name}</h3>
-                                <p className="text-xs text-slate-500">Foto ini akan digunakan oleh sistem AI Kiosk untuk memverifikasi absensi staff bersangkutan.</p>
+                            <div className="bg-white max-w-lg w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+                                <button 
+                                    onClick={() => setEditingEmp(null)}
+                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
+                                >
+                                    ✕
+                                </button>
 
-                                <form onSubmit={handleUpdateMasterPhoto} className="space-y-4 text-xs">
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">URL Foto Acuan Baru</label>
-                                        <input 
-                                            type="text" 
-                                            value={editPhotoUrl} 
-                                            onChange={(e) => setEditPhotoUrl(e.target.value)} 
-                                            className="w-full p-3 bg-cream-50 border rounded-xl outline-none" 
-                                            required 
-                                        />
+                                <div className="space-y-1">
+                                    <h3 className="font-black text-slate-800 text-base">✏️ Edit Data Staff — {editingEmp.id}</h3>
+                                    <p className="text-xs text-slate-500">Ubah detail data karyawan serta Foto Acuan Biometrik AI.</p>
+                                </div>
+
+                                <form onSubmit={handleUpdateEmployee} className="space-y-4 text-xs">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Nama Lengkap Staff</label>
+                                            <input 
+                                                type="text" 
+                                                value={editEmpName} 
+                                                onChange={(e) => setEditEmpName(e.target.value)} 
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
+                                                required 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">No. WhatsApp / Telepon</label>
+                                            <input 
+                                                type="text" 
+                                                value={editEmpPhone} 
+                                                onChange={(e) => setEditEmpPhone(e.target.value)} 
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
+                                                required 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Jabatan Staff</label>
+                                            <select 
+                                                value={editEmpRole} 
+                                                onChange={(e) => setEditEmpRole(e.target.value)} 
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold"
+                                            >
+                                                {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Outlet Penempatan</label>
+                                            <select 
+                                                value={editEmpStore} 
+                                                onChange={(e) => setEditEmpStore(e.target.value)} 
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold"
+                                            >
+                                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block font-bold text-slate-700 mb-1">Shift Kerja</label>
+                                            <input 
+                                                type="text" 
+                                                value={editEmpShift} 
+                                                onChange={(e) => setEditEmpShift(e.target.value)} 
+                                                placeholder="Contoh: 08:00 - 16:00"
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
+                                                required 
+                                            />
+                                        </div>
                                     </div>
 
-                                    {/* Preview photo */}
-                                    <div className="text-center space-y-2">
-                                        <p className="font-bold text-slate-600 text-[11px]">Preview Foto Acuan:</p>
-                                        <div className="w-28 h-28 mx-auto rounded-2xl overflow-hidden border-2 border-brand-600 shadow-md bg-slate-900">
-                                            <img src={editPhotoUrl} className="w-full h-full object-cover" onError={(e) => { e.target.src = 'https://placehold.co/200?text=No+Photo'; }} />
+                                    {/* Pilihan Sumber Foto Edit */}
+                                    <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 space-y-3">
+                                        <label className="block font-bold text-slate-800">📸 Pilihan Foto Acuan Biometrik AI</label>
+                                        
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditPhotoOption('upload')}
+                                                className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs border ${
+                                                    editPhotoOption === 'upload' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-cream-300'
+                                                }`}
+                                            >
+                                                💻 Upload Komputer
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditPhotoOption('drive')}
+                                                className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs border ${
+                                                    editPhotoOption === 'drive' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-cream-300'
+                                                }`}
+                                            >
+                                                ☁️ Google Drive / Link URL
+                                            </button>
                                         </div>
+
+                                        {editPhotoOption === 'upload' ? (
+                                            <div>
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*" 
+                                                    onChange={(e) => handleFileUpload(e, setEditPhotoValue)} 
+                                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-100 file:text-brand-800 hover:file:bg-brand-200 cursor-pointer"
+                                                />
+                                                <p className="text-[10px] text-slate-400 mt-1">Pilih berkas foto dari komputer / HP Anda (JPG, PNG).</p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <input 
+                                                    type="text" 
+                                                    value={editPhotoValue} 
+                                                    onChange={(e) => setEditPhotoValue(e.target.value)} 
+                                                    placeholder="Tempel link foto Google Drive atau URL web..."
+                                                    className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none text-xs font-mono" 
+                                                    required 
+                                                />
+                                                <p className="text-[10px] text-slate-400 mt-1">Mendukung link share Google Drive (Otomatis dikonversi ke gambar langsung).</p>
+                                            </div>
+                                        )}
+
+                                        {editPhotoValue && (
+                                            <div className="flex items-center gap-3 pt-2">
+                                                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900 shrink-0">
+                                                    <img 
+                                                        src={convertGoogleDriveUrl(editPhotoValue)} 
+                                                        className="w-full h-full object-cover" 
+                                                        onError={(e) => { e.target.src = 'https://placehold.co/150?text=Gambar+Error'; }} 
+                                                    />
+                                                </div>
+                                                <div className="text-[11px]">
+                                                    <span className="font-bold text-slate-800 block">Preview Foto Acuan</span>
+                                                    <span className="text-emerald-700 font-semibold">Siap digunakan untuk verifikasi Kiosk AI</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex gap-2 pt-2">
                                         <button 
                                             type="button" 
-                                            onClick={() => setEditingEmpPhoto(null)} 
-                                            className="w-1/2 py-2.5 bg-cream-200 text-slate-700 font-bold rounded-xl"
+                                            onClick={() => setEditingEmp(null)} 
+                                            className="w-1/2 py-3 bg-cream-200 hover:bg-cream-300 text-slate-700 font-bold rounded-xl transition-all"
                                         >
                                             Batal
                                         </button>
                                         <button 
                                             type="submit" 
-                                            className="w-1/2 py-2.5 bg-brand-600 text-white font-bold rounded-xl shadow-md"
+                                            className="w-1/2 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition-all"
                                         >
-                                            Simpan Foto Acuan
+                                            💾 Simpan Perubahan Staff
                                         </button>
                                     </div>
                                 </form>
@@ -1291,52 +1524,165 @@
                         </div>
                     )}
 
+                    {/* TAB STAFF & FOTO ACUAN */}
                     {adminTab === 'employees' && (
                         <div className="space-y-6">
-                            <form onSubmit={handleAddEmployee} className="bg-cream-50 p-4 rounded-2xl border border-cream-200 space-y-3 text-xs">
-                                <h4 className="font-extrabold text-slate-800 text-sm">+ Registrasi Staff Baru & Upload Foto Acuan Master Admin</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            {/* FORM TAMBAH STAFF BARU */}
+                            <form onSubmit={handleAddEmployee} className="bg-cream-50 p-5 rounded-3xl border border-cream-200 space-y-4 text-xs">
+                                <div className="flex items-center justify-between border-b border-cream-200 pb-2">
+                                    <h4 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                                        <span>👤</span> Tambah Karyawan / Staff Baru Puding Panen Bali
+                                    </h4>
+                                    <span className="px-2.5 py-1 bg-brand-100 text-brand-800 text-[10px] font-extrabold rounded-full">
+                                        Master Data Admin
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div>
                                         <label className="block font-bold text-slate-700 mb-1">Nama Karyawan</label>
-                                        <input type="text" value={newEmpName} onChange={(e) => setNewEmpName(e.target.value)} placeholder="Contoh: Ni Luh Sari" className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none" required />
+                                        <input 
+                                            type="text" 
+                                            value={newEmpName} 
+                                            onChange={(e) => setNewEmpName(e.target.value)} 
+                                            placeholder="Contoh: Ni Luh Sari" 
+                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
+                                            required 
+                                        />
                                     </div>
+
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Jabatan</label>
-                                        <select value={newEmpRole} onChange={(e) => setNewEmpRole(e.target.value)} className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none">
+                                        <label className="block font-bold text-slate-700 mb-1">No. WhatsApp / HP</label>
+                                        <input 
+                                            type="text" 
+                                            value={newEmpPhone} 
+                                            onChange={(e) => setNewEmpPhone(e.target.value)} 
+                                            placeholder="Contoh: 081234567890" 
+                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Shift Kerja Utama</label>
+                                        <input 
+                                            type="text" 
+                                            value={newEmpShift} 
+                                            onChange={(e) => setNewEmpShift(e.target.value)} 
+                                            placeholder="Contoh: 08:00 - 16:00" 
+                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Jabatan / Role</label>
+                                        <select 
+                                            value={newEmpRole} 
+                                            onChange={(e) => setNewEmpRole(e.target.value)} 
+                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold"
+                                        >
                                             {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
                                         </select>
                                     </div>
+
                                     <div>
                                         <label className="block font-bold text-slate-700 mb-1">Outlet Utama</label>
-                                        <select value={newEmpStore} onChange={(e) => setNewEmpStore(e.target.value)} className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none">
+                                        <select 
+                                            value={newEmpStore} 
+                                            onChange={(e) => setNewEmpStore(e.target.value)} 
+                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold"
+                                        >
                                             {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">URL Foto Acuan Admin</label>
-                                        <input type="text" value={newEmpPhoto} onChange={(e) => setNewEmpPhoto(e.target.value)} className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none" required />
-                                    </div>
                                 </div>
-                                <button type="submit" className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-sm text-xs">
-                                    + Simpan Staff & Daftarkan Foto Acuan Admin
+
+                                {/* Pilihan Foto Tambah Staff */}
+                                <div className="p-4 bg-white rounded-2xl border border-cream-300 space-y-3">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                        <label className="font-bold text-slate-800">📸 Opsi Upload Foto Acuan Master (Biometrik Wajah)</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewPhotoOption('upload')}
+                                                className={`px-3 py-1 rounded-xl font-bold transition-all text-xs border ${
+                                                    newPhotoOption === 'upload' ? 'bg-brand-600 text-white border-brand-600' : 'bg-cream-50 text-slate-700 border-cream-300'
+                                                }`}
+                                            >
+                                                💻 Upload Komputer
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewPhotoOption('drive')}
+                                                className={`px-3 py-1 rounded-xl font-bold transition-all text-xs border ${
+                                                    newPhotoOption === 'drive' ? 'bg-brand-600 text-white border-brand-600' : 'bg-cream-50 text-slate-700 border-cream-300'
+                                                }`}
+                                            >
+                                                ☁️ Google Drive / URL
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {newPhotoOption === 'upload' ? (
+                                        <div>
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={(e) => handleFileUpload(e, setNewPhotoValue)} 
+                                                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-100 file:text-brand-800 hover:file:bg-brand-200 cursor-pointer"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-1">Pilih file foto berwajah jelas dari galeri atau penyimpanan lokal.</p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <input 
+                                                type="text" 
+                                                value={newPhotoValue} 
+                                                onChange={(e) => setNewPhotoValue(e.target.value)} 
+                                                placeholder="Tempel link bagikan Google Drive atau URL foto web..."
+                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none text-xs font-mono" 
+                                                required 
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-1">Sistem otomatis mengonversi link Google Drive publik menjadi link gambar.</p>
+                                        </div>
+                                    )}
+
+                                    {newPhotoValue && (
+                                        <div className="flex items-center gap-3 pt-1">
+                                            <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900 shrink-0">
+                                                <img 
+                                                    src={convertGoogleDriveUrl(newPhotoValue)} 
+                                                    className="w-full h-full object-cover" 
+                                                    onError={(e) => { e.target.src = 'https://placehold.co/150?text=Error'; }} 
+                                                />
+                                            </div>
+                                            <span className="text-[11px] text-slate-600 font-medium">Pratinjau Foto Acuan Terdaftar</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-2xl shadow-md transition-all text-xs flex items-center justify-center gap-2">
+                                    <span>➕ Simpan Staff Baru & Daftarkan Foto Acuan Admin</span>
                                 </button>
                             </form>
 
-                            <div className="overflow-x-auto">
+                            {/* TABEL DAFTAR STAFF */}
+                            <div className="overflow-x-auto border border-cream-200 rounded-2xl">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200">
+                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
                                         <tr>
                                             <th className="p-3">Foto Acuan Admin</th>
                                             <th className="p-3">ID & Nama Staff</th>
-                                            <th className="p-3">Jabatan</th>
+                                            <th className="p-3">No. Telepon</th>
+                                            <th className="p-3">Jabatan & Shift</th>
                                             <th className="p-3">Outlet Utama</th>
-                                            <th className="p-3">Status Acuan Foto</th>
-                                            <th className="p-3">Aksi Admin</th>
+                                            <th className="p-3 text-center">Kelola Staff (CRUD)</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-cream-200">
                                         {employees.map(emp => (
-                                            <tr key={emp.id} className="hover:bg-cream-50">
+                                            <tr key={emp.id} className="hover:bg-cream-50 transition-all">
                                                 <td className="p-3">
                                                     <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900">
                                                         <img src={emp.masterPhoto} className="w-full h-full object-cover" />
@@ -1344,33 +1690,132 @@
                                                 </td>
                                                 <td className="p-3">
                                                     <div className="font-extrabold text-slate-800 text-sm">{emp.name}</div>
-                                                    <div className="font-mono text-[10px] text-slate-500">{emp.id} — {emp.phone}</div>
+                                                    <div className="font-mono text-[10px] text-slate-500">{emp.id}</div>
                                                 </td>
-                                                <td className="p-3 text-slate-600 font-bold">{emp.role} {emp.isDriver && '🚚'}</td>
-                                                <td className="p-3 text-slate-600">{stores.find(s => s.id === emp.storeId)?.name || 'N/A'}</td>
+                                                <td className="p-3 font-mono text-slate-700">{emp.phone}</td>
                                                 <td className="p-3">
-                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md">
-                                                        ✅ Master Photo Set
-                                                    </span>
-                                                    <div className="text-[9px] text-slate-400 font-mono mt-0.5">
-                                                        {emp.photoRegisteredAt || 'Initial Registration'}
+                                                    <div className="font-bold text-slate-800">{emp.role} {emp.isDriver && '🚚'}</div>
+                                                    <div className="text-[10px] text-slate-500">{emp.shift || '08:00 - 16:00'}</div>
+                                                </td>
+                                                <td className="p-3 text-slate-600 font-semibold">{stores.find(s => s.id === emp.storeId)?.name || 'N/A'}</td>
+                                                <td className="p-3">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenEditModal(emp)}
+                                                            className="px-3 py-1.5 bg-cream-200 hover:bg-cream-300 text-slate-800 font-bold rounded-xl transition-all flex items-center gap-1"
+                                                        >
+                                                            ✏️ Edit Staff
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteEmployee(emp)}
+                                                            className="px-3 py-1.5 bg-brand-100 hover:bg-brand-200 text-brand-800 font-bold rounded-xl transition-all flex items-center gap-1"
+                                                        >
+                                                            🗑️ Hapus
+                                                        </button>
                                                     </div>
-                                                </td>
-                                                <td className="p-3">
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingEmpPhoto(emp);
-                                                            setEditPhotoUrl(emp.masterPhoto);
-                                                        }}
-                                                        className="px-2.5 py-1 bg-cream-200 hover:bg-cream-300 text-slate-700 font-bold rounded-lg transition-all"
-                                                    >
-                                                        🖼️ Edit Foto Acuan
-                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* KEAMANAN ADMIN TAB (CHANGE PASSWORD) */}
+                    {adminTab === 'security' && (
+                        <div className="max-w-xl mx-auto space-y-6">
+                            <div className="p-6 bg-cream-50 rounded-3xl border border-cream-200 space-y-5 shadow-sm">
+                                <div className="flex items-center gap-3 border-b border-cream-300 pb-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-brand-100 text-brand-700 border border-brand-200 flex items-center justify-center text-2xl font-bold">
+                                        🔑
+                                    </div>
+                                    <div>
+                                        <h3 className="font-extrabold text-slate-800 text-base">Ganti Password Super Admin</h3>
+                                        <p className="text-xs text-slate-500">Jaga keamanan portal kontrol HRIS dengan memperbarui password secara berkala.</p>
+                                    </div>
+                                </div>
+
+                                {passChangeError && (
+                                    <div className="p-3.5 bg-brand-50 border border-brand-200 rounded-2xl text-brand-800 text-xs font-bold flex items-center gap-2">
+                                        <span>⚠️</span>
+                                        <span>{passChangeError}</span>
+                                    </div>
+                                )}
+
+                                {passChangeSuccess && (
+                                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+                                        <span>✅</span>
+                                        <span>{passChangeSuccess}</span>
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleChangeAdminPassword} className="space-y-4 text-xs">
+                                    <div className="p-3 bg-white rounded-2xl border border-cream-200 flex justify-between items-center text-slate-700">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 block uppercase">Username Admin Aktif:</span>
+                                            <strong className="font-mono text-sm text-slate-800">{adminCredentials.username}</strong>
+                                        </div>
+                                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                                            Status: Terproteksi
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Password Saat Ini (Lama)</label>
+                                        <input 
+                                            type={showPasswordText ? "text" : "password"} 
+                                            placeholder="Masukkan password lama..."
+                                            value={oldPasswordInput}
+                                            onChange={(e) => setOldPasswordInput(e.target.value)}
+                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Password Baru</label>
+                                        <input 
+                                            type={showPasswordText ? "text" : "password"} 
+                                            placeholder="Masukkan password baru (min. 6 karakter)..."
+                                            value={newPasswordInput}
+                                            onChange={(e) => setNewPasswordInput(e.target.value)}
+                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Konfirmasi Password Baru</label>
+                                        <input 
+                                            type={showPasswordText ? "text" : "password"} 
+                                            placeholder="Ketik ulang password baru..."
+                                            value={confirmPasswordInput}
+                                            onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between items-center pt-1">
+                                        <label className="flex items-center gap-2 text-slate-600 font-semibold cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={showPasswordText} 
+                                                onChange={(e) => setShowPasswordText(e.target.checked)}
+                                                className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4" 
+                                            />
+                                            <span>Tampilkan karakter password</span>
+                                        </label>
+                                    </div>
+
+                                    <button 
+                                        type="submit" 
+                                        className="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-2xl shadow-md transition-all text-xs flex items-center justify-center gap-2"
+                                    >
+                                        <span>💾 Perbarui & Simpan Password Baru</span>
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     )}
@@ -1436,7 +1881,6 @@
         function AdminDashboardModule({ stores, employees, records, notifications, offlineQueueLength, onSelectRecord, exportToCSV }) {
             return (
                 <div className="space-y-6">
-                    {/* Metrics Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                         <div className="p-4 bg-white rounded-2xl border border-cream-300 shadow-sm space-y-1">
                             <p className="text-slate-500 font-bold">Total Staff Terdaftar</p>
@@ -1460,7 +1904,6 @@
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Feed Attendance Records */}
                         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="font-extrabold text-base text-slate-800">Riwayat Absensi & Hasil Match Wajah</h3>
@@ -1474,46 +1917,59 @@
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200">
+                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
                                         <tr>
-                                            <th className="p-3">Foto Acuan vs Live</th>
-                                            <th className="p-3">Staff</th>
-                                            <th className="p-3">Tipe Absen</th>
-                                            <th className="p-3">Kemiripan Wajah</th>
-                                            <th className="p-3">Audit Detail</th>
+                                            <th className="p-3">Foto Live vs Master</th>
+                                            <th className="p-3">Nama Staff & Outlet</th>
+                                            <th className="p-3">Waktu Presensi</th>
+                                            <th className="p-3">Keterlambatan</th>
+                                            <th className="p-3">Akurasi AI</th>
+                                            <th className="p-3 text-center">Aksi Audit</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-cream-200">
-                                        {records.map(r => (
-                                            <tr key={r.id} className="hover:bg-cream-50 transition-all cursor-pointer" onClick={() => onSelectRecord(r)}>
+                                        {records.map(rec => (
+                                            <tr key={rec.id} className="hover:bg-cream-50 transition-all">
                                                 <td className="p-3">
-                                                    <div className="flex items-center gap-1">
-                                                        <img src={r.masterPhotoRef} className="w-9 h-9 rounded-lg object-cover border border-emerald-500" title="Foto Acuan Admin" />
-                                                        <span className="text-[10px] text-slate-400">vs</span>
-                                                        <img src={r.capturedPhoto} className={`w-9 h-9 rounded-lg object-cover border ${r.matchStatus === 'MATCHED' ? 'border-emerald-500' : 'border-red-500'}`} title="Foto Live Absen" />
+                                                    <div className="flex -space-x-2 overflow-hidden">
+                                                        <img src={rec.masterPhotoRef} className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-500 object-cover" title="Master Acuan Admin" />
+                                                        <img src={rec.capturedPhoto} className="inline-block h-8 w-8 rounded-full ring-2 ring-brand-500 object-cover" title="Foto Captured Kiosk" />
                                                     </div>
                                                 </td>
                                                 <td className="p-3">
-                                                    <div className="font-bold text-slate-800">{r.employeeName}</div>
-                                                    <div className="text-[10px] text-slate-500">{r.storeName}</div>
+                                                    <div className="font-extrabold text-slate-800">{rec.employeeName}</div>
+                                                    <div className="text-[10px] text-slate-500">{rec.storeName}</div>
                                                 </td>
-                                                <td className="p-3">
-                                                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                                                        r.attendanceType === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-100 text-brand-800'
+                                                <td className="p-3 font-mono text-slate-700">
+                                                    <div>{rec.checkIn || rec.checkOut}</div>
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                        rec.attendanceType === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-100 text-brand-800'
                                                     }`}>
-                                                        {r.attendanceType === 'CHECK_IN' ? 'MASUK' : 'PULANG'}
+                                                        {rec.attendanceType}
                                                     </span>
                                                 </td>
                                                 <td className="p-3">
-                                                    <span className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${
-                                                        r.matchStatus === 'MATCHED' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                        {r.confidence}% Match ({r.matchStatus})
+                                                    {rec.isLate ? (
+                                                        <span className="px-2 py-0.5 bg-brand-100 text-brand-800 font-bold rounded-full text-[10px]">
+                                                            Terlambat {rec.lateMinutes}m
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px]">
+                                                            Tepat Waktu
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 font-mono font-bold">
+                                                    <span className={rec.matchStatus === 'MATCHED' ? 'text-emerald-600' : 'text-brand-600'}>
+                                                        {rec.confidence}% Match
                                                     </span>
                                                 </td>
-                                                <td className="p-3">
-                                                    <button className="px-2.5 py-1 bg-cream-200 hover:bg-cream-300 text-slate-700 font-bold rounded-lg text-[10px]">
-                                                        🔎 Buka Audit
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => onSelectRecord(rec)}
+                                                        className="px-2.5 py-1 bg-cream-200 hover:bg-cream-300 text-slate-800 font-bold rounded-lg text-[10px] transition-all"
+                                                    >
+                                                        🔍 Detail Biometrik
                                                     </button>
                                                 </td>
                                             </tr>
@@ -1523,17 +1979,17 @@
                             </div>
                         </div>
 
-                        {/* Notifications Side Pane */}
+                        {/* Notification feed */}
                         <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-4">
-                            <h3 className="font-extrabold text-base text-slate-800">Notifikasi System</h3>
-                            <div className="space-y-3 text-xs">
-                                {notifications.map(n => (
-                                    <div key={n.id} className="p-3 rounded-2xl bg-cream-50 border border-cream-200 space-y-1">
-                                        <div className="flex justify-between items-center font-bold text-slate-800">
-                                            <span>{n.title}</span>
-                                            <span className="text-[10px] text-slate-400 font-normal">{n.time}</span>
+                            <h3 className="font-extrabold text-base text-slate-800">🔔 Notifikasi & Log Real-Time</h3>
+                            <div className="space-y-3">
+                                {notifications.map(notif => (
+                                    <div key={notif.id} className="p-3 bg-cream-50 rounded-2xl border border-cream-200 text-xs space-y-1">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-slate-800">{notif.title}</span>
+                                            <span className="text-[10px] text-slate-400">{notif.time}</span>
                                         </div>
-                                        <p className="text-slate-600 text-[11px]">{n.message}</p>
+                                        <p className="text-slate-600 text-[11px]">{notif.message}</p>
                                     </div>
                                 ))}
                             </div>
@@ -1543,144 +1999,122 @@
             );
         }
 
-        function DriverOvertimeModule() {
-            const [schedIn, setSchedIn] = useState('11:00');
-            const [schedOut, setSchedOut] = useState('20:00');
-            const [actualIn, setActualIn] = useState('09:45');
-            const [actualOut, setActualOut] = useState('21:30');
+        function DriverOvertimeModule({ employees, showToast, logAuditAction }) {
+            const drivers = employees.filter(e => e.isDriver || e.role.toLowerCase().includes('driver'));
 
-            const calculateOT = () => {
-                const [sInH, sInM] = schedIn.split(':').map(Number);
-                const [sOutH, sOutM] = schedOut.split(':').map(Number);
-                const [aInH, aInM] = actualIn.split(':').map(Number);
-                const [aOutH, aOutM] = actualOut.split(':').map(Number);
+            const [driverLogs, setDriverLogs] = useState([
+                { id: 'OT-101', driverId: 'EMP-003', driverName: 'I Nyoman Budi (Supir)', route: 'Pengiriman Outlet Renon - Teuku Umar', extraHours: 2, bonusAmount: 50000, date: '2026-08-02', status: 'Approved' }
+            ]);
 
-                const earlyInMins = (sInH * 60 + sInM) - (aInH * 60 + aInM);
-                const methodAEarly = earlyInMins >= 60 ? Math.floor(earlyInMins / 60) : 0;
+            const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?.id || '');
+            const [routeInput, setRouteInput] = useState('');
+            const [extraHoursInput, setExtraHoursInput] = useState(1);
 
-                const lateOutMins = (aOutH * 60 + aOutM) - (sOutH * 60 + sOutM);
-                const methodALate = lateOutMins >= 60 ? Math.floor(lateOutMins / 60) : 0;
+            const handleAddDriverOT = (e) => {
+                e.preventDefault();
+                const driverObj = employees.find(e => e.id === selectedDriverId);
+                if (!driverObj) return;
 
-                const methodATotal = methodAEarly + methodALate;
-
-                const totalWorkedMins = (aOutH * 60 + aOutM) - (aInH * 60 + aInM);
-                const totalWorkedHours = totalWorkedMins / 60;
-                const methodBTotal = totalWorkedHours > 9 ? Math.floor(totalWorkedHours - 9) : 0;
-
-                return {
-                    methodA: methodATotal,
-                    methodB: methodBTotal,
-                    totalWorkedHours: totalWorkedHours.toFixed(1),
-                    winner: methodATotal >= methodBTotal ? 'Metode A' : 'Metode B',
-                    finalOT: Math.max(methodATotal, methodBTotal)
+                const newLog = {
+                    id: `OT-${Math.floor(100 + Math.random() * 900)}`,
+                    driverId: driverObj.id,
+                    driverName: driverObj.name,
+                    route: routeInput || 'Pengiriman Pasokan Puding Antar Outlet',
+                    extraHours: Number(extraHoursInput),
+                    bonusAmount: Number(extraHoursInput) * 25000,
+                    date: new Date().toISOString().slice(0, 10),
+                    status: 'Approved'
                 };
+
+                setDriverLogs(prev => [newLog, ...prev]);
+                logAuditAction('ADD_DRIVER_OT', `Lembur Supir (${driverObj.name}): ${extraHoursInput} jam`);
+                showToast(`Lembur supir ${driverObj.name} berhasil dicatat! Bonus: Rp ${(extraHoursInput * 25000).toLocaleString('id-ID')}`, 'success');
+
+                setRouteInput('');
+                setExtraHoursInput(1);
             };
 
-            const result = calculateOT();
-
-            return (
-                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6 max-w-3xl mx-auto">
-                    <div>
-                        <h2 className="text-lg font-black text-brand-700">🚚 Kalkulator Lembur Supir / Driver Delivery</h2>
-                        <p className="text-xs text-slate-500">Kalkulasi lembur otomatis berdasarkan presensi jam datang & pulang supir Puding Panen Bali.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                        <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 space-y-3">
-                            <h4 className="font-bold text-slate-800">1. Shift Resmi Driver</h4>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Jam Masuk Shift</label>
-                                <input type="time" value={schedIn} onChange={(e) => setSchedIn(e.target.value)} className="w-full p-2 bg-white border rounded-xl" />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Jam Pulang Shift</label>
-                                <input type="time" value={schedOut} onChange={(e) => setSchedOut(e.target.value)} className="w-full p-2 bg-white border rounded-xl" />
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 space-y-3">
-                            <h4 className="font-bold text-slate-800">2. Hasil Foto Absen Kiosk</h4>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Jam Datang Live</label>
-                                <input type="time" value={actualIn} onChange={(e) => setActualIn(e.target.value)} className="w-full p-2 bg-white border rounded-xl" />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Jam Pulang Live</label>
-                                <input type="time" value={actualOut} onChange={(e) => setActualOut(e.target.value)} className="w-full p-2 bg-white border rounded-xl" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-5 bg-brand-50 border border-brand-200 rounded-2xl space-y-3 text-xs">
-                        <h4 className="font-black text-brand-800 text-sm">Hasil Kalkulasi Lembur Driver:</h4>
-                        <div className="grid grid-cols-2 gap-2 text-slate-700">
-                            <div>Metode A (Datang Awal + Pulang Akhir): <strong>{result.methodA} Jam</strong></div>
-                            <div>Metode B (Total Jam &gt; 9 Jam): <strong>{result.methodB} Jam</strong></div>
-                            <div>Total Waktu Kerja: <strong>{result.totalWorkedHours} Jam</strong></div>
-                            <div className="text-brand-700 font-bold">Lembur Disetujui: {result.finalOT} Jam ({result.winner})</div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function PayrollSummaryModule({ records, employees, exportToCSV, onSelectPayslip }) {
             return (
                 <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-lg font-black text-brand-700">💰 Summary Payroll & Insentif Staff</h2>
-                            <p className="text-xs text-slate-500">Rekapitulasi gaji pokok, bonus lembur, dan potongan berdasarkan presensi terverifikasi.</p>
-                        </div>
-                        <button 
-                            onClick={() => exportToCSV(employees.map(e => ({ ID: e.id, Nama: e.name, Jabatan: e.role, Gaji: e.salary })), 'payroll_puding_panen_bali')}
-                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md"
-                        >
-                            📥 Export CSV Payroll
-                        </button>
+                    <div className="border-b border-cream-200 pb-3">
+                        <h2 className="text-lg font-black text-brand-700">🚚 Kelola Lembur & Rutinitas Driver Delivery</h2>
+                        <p className="text-xs text-slate-500">Pencatatan rute jalan, ekstra jam pengiriman, dan insentif lembur supir.</p>
                     </div>
 
-                    <div className="overflow-x-auto text-xs">
-                        <table className="w-full text-left">
-                            <thead className="bg-cream-50 text-slate-600 border-b border-cream-200">
+                    <form onSubmit={handleAddDriverOT} className="bg-cream-50 p-4 rounded-2xl border border-cream-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <label className="block font-bold text-slate-700 mb-1">Pilih Supir / Driver</label>
+                            <select 
+                                value={selectedDriverId} 
+                                onChange={(e) => setSelectedDriverId(e.target.value)}
+                                className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-bold"
+                            >
+                                {drivers.map(d => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block font-bold text-slate-700 mb-1">Keterangan Rute / Tugas</label>
+                            <input 
+                                type="text" 
+                                value={routeInput} 
+                                onChange={(e) => setRouteInput(e.target.value)} 
+                                placeholder="Contoh: Pengiriman Stok Gatsu -> Renon"
+                                className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-semibold" 
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block font-bold text-slate-700 mb-1">Jam Lembur (Rp 25.000 / Jam)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="8" 
+                                    value={extraHoursInput} 
+                                    onChange={(e) => setExtraHoursInput(e.target.value)}
+                                    className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-bold" 
+                                    required 
+                                />
+                                <button type="submit" className="px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl whitespace-nowrap shadow-sm">
+                                    + Catat OT
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div className="overflow-x-auto border border-cream-200 rounded-2xl">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
                                 <tr>
-                                    <th className="p-3">Karyawan</th>
-                                    <th className="p-3">Gaji Pokok</th>
-                                    <th className="p-3">Presensi AI Valid</th>
+                                    <th className="p-3">ID Log</th>
+                                    <th className="p-3">Nama Supir</th>
+                                    <th className="p-3">Rute Pengiriman</th>
+                                    <th className="p-3">Tanggal</th>
                                     <th className="p-3">Jam Lembur</th>
-                                    <th className="p-3">Total Gaji (THP)</th>
-                                    <th className="p-3">Aksi Cetak</th>
+                                    <th className="p-3">Bonus Tambahan</th>
+                                    <th className="p-3">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-cream-200">
-                                {employees.map(emp => {
-                                    const empRecords = records.filter(r => r.employeeId === emp.id);
-                                    const otHours = empRecords.reduce((acc, curr) => acc + (curr.overtimeHours || 0), 0);
-                                    const lateCount = empRecords.filter(r => r.isLate).length;
-                                    const deduction = lateCount * 25000;
-                                    const otBonus = otHours * 20000;
-                                    const finalSalary = emp.salary + otBonus - deduction;
-
-                                    const payslipData = { ...emp, otBonus, deduction, finalSalary };
-
-                                    return (
-                                        <tr key={emp.id} className="hover:bg-cream-50 font-mono">
-                                            <td className="p-3 font-sans font-bold text-slate-800">{emp.name}</td>
-                                            <td className="p-3">Rp {emp.salary.toLocaleString('id-ID')}</td>
-                                            <td className="p-3 text-emerald-600 font-bold">{empRecords.length} Hari Valid</td>
-                                            <td className="p-3 text-emerald-600 font-bold">+{otHours} Jam</td>
-                                            <td className="p-3 font-extrabold text-slate-900 text-sm">Rp {finalSalary.toLocaleString('id-ID')}</td>
-                                            <td className="p-3 font-sans">
-                                                <button 
-                                                    onClick={() => onSelectPayslip(payslipData)}
-                                                    className="px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg text-[10px] shadow-sm"
-                                                >
-                                                    🖨️ Cetak Slip
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                {driverLogs.map(log => (
+                                    <tr key={log.id} className="hover:bg-cream-50">
+                                        <td className="p-3 font-mono text-slate-500">{log.id}</td>
+                                        <td className="p-3 font-extrabold text-slate-800">{log.driverName}</td>
+                                        <td className="p-3 text-slate-700">{log.route}</td>
+                                        <td className="p-3 text-slate-500">{log.date}</td>
+                                        <td className="p-3 font-bold text-slate-800">{log.extraHours} Jam</td>
+                                        <td className="p-3 font-mono font-bold text-emerald-700">Rp {log.bonusAmount.toLocaleString('id-ID')}</td>
+                                        <td className="p-3">
+                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -1688,7 +2122,93 @@
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        function PayrollSummaryModule({ records, employees, stores, exportToCSV, onSelectPayslip }) {
+            const payrollData = employees.map(emp => {
+                const empAtt = records.filter(r => r.employeeId === emp.id);
+                const lateCount = empAtt.filter(r => r.isLate).length;
+                const deduction = lateCount * 25000;
+                
+                // Extra bonus for driver or overtime
+                const isDriver = emp.isDriver;
+                const otBonus = isDriver ? 50000 : 0;
+                const finalSalary = emp.salary + otBonus - deduction;
+
+                return {
+                    ...emp,
+                    attendanceCount: empAtt.length,
+                    lateCount,
+                    deduction,
+                    otBonus,
+                    finalSalary
+                };
+            });
+
+            return (
+                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-cream-200 pb-3">
+                        <div>
+                            <h2 className="text-lg font-black text-brand-700">💰 Rekapitulasi Payroll & Slip Gaji Karyawan</h2>
+                            <p className="text-xs text-slate-500">Perhitungan otomatis gaji pokok, insentif lembur AI, dan denda keterlambatan.</p>
+                        </div>
+                        <button 
+                            onClick={() => exportToCSV(payrollData, 'payroll_puding_panen_bali')}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm"
+                        >
+                            📥 Export Rekap Payroll
+                        </button>
+                    </div>
+
+                    <div className="overflow-x-auto border border-cream-200 rounded-2xl">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
+                                <tr>
+                                    <th className="p-3">Staff & ID</th>
+                                    <th className="p-3">Jabatan</th>
+                                    <th className="p-3">Gaji Pokok</th>
+                                    <th className="p-3">Presensi / Terlambat</th>
+                                    <th className="p-3">Denda Keterlambatan</th>
+                                    <th className="p-3">Bonus Lembur</th>
+                                    <th className="p-3">Take Home Pay</th>
+                                    <th className="p-3 text-center">Cetak Slip</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-cream-200">
+                                {payrollData.map(item => (
+                                    <tr key={item.id} className="hover:bg-cream-50 transition-all">
+                                        <td className="p-3">
+                                            <div className="font-extrabold text-slate-800">{item.name}</div>
+                                            <div className="font-mono text-[10px] text-slate-500">{item.id}</div>
+                                        </td>
+                                        <td className="p-3 font-semibold text-slate-700">{item.role}</td>
+                                        <td className="p-3 font-mono">Rp {item.salary.toLocaleString('id-ID')}</td>
+                                        <td className="p-3">
+                                            <span className="font-bold text-slate-800">{item.attendanceCount} Absen</span>
+                                            {item.lateCount > 0 && (
+                                                <span className="text-[10px] text-brand-700 font-bold block">({item.lateCount}x Terlambat)</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 font-mono text-brand-700 font-bold">- Rp {item.deduction.toLocaleString('id-ID')}</td>
+                                        <td className="p-3 font-mono text-emerald-700 font-bold">+ Rp {item.otBonus.toLocaleString('id-ID')}</td>
+                                        <td className="p-3 font-mono font-black text-slate-900 text-sm">Rp {item.finalSalary.toLocaleString('id-ID')}</td>
+                                        <td className="p-3 text-center">
+                                            <button
+                                                onClick={() => onSelectPayslip(item)}
+                                                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-[10px] shadow-sm transition-all"
+                                            >
+                                                📑 Slip Gaji
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
         root.render(<App />);
     </script>
 </body>
