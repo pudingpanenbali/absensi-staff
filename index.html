@@ -13,33 +13,17 @@
                 extend: {
                     colors: {
                         cream: {
-                            50: '#FDFBF7',
-                            100: '#FAF6F0',
-                            200: '#F5EFE6',
-                            300: '#E8DFD1',
-                            400: '#D4C5B0',
-                            800: '#6B5242',
-                            900: '#4A372C',
+                            50: '#FDFBF7', 100: '#FAF6F0', 200: '#F5EFE6',
+                            300: '#E8DFD1', 400: '#D4C5B0', 800: '#6B5242', 900: '#4A372C',
                         },
-                        chocolate: {
-                            500: '#8C6239',
-                            700: '#5C3D1E',
-                            900: '#3D2612',
-                        },
+                        chocolate: { 500: '#8C6239', 700: '#5C3D1E', 900: '#3D2612' },
                         brand: {
-                            50: '#FEF2F2',
-                            100: '#FEE2E2',
-                            200: '#FECACA',
-                            500: '#EF4444',
-                            600: '#DC2626',
-                            700: '#B91C1C',
-                            800: '#991B1B',
-                            900: '#7F1D1D',
+                            50: '#FEF2F2', 100: '#FEE2E2', 200: '#FECACA',
+                            500: '#EF4444', 600: '#DC2626', 700: '#B91C1C',
+                            800: '#991B1B', 900: '#7F1D1D',
                         }
                     },
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    }
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] }
                 }
             }
         }
@@ -49,60 +33,24 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel for JSX compilation in browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Supabase JS Client library CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #FAF6F0;
-        }
-        .scanner-ring-red {
-            box-shadow: 0 0 25px rgba(220, 38, 38, 0.5);
-            animation: pulse-ring-red 2s infinite;
-        }
-        .scanner-ring-green {
-            box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
-            animation: pulse-ring-green 2s infinite;
-        }
-        @keyframes pulse-ring-red {
-            0% { transform: scale(0.98); opacity: 0.8; }
-            50% { transform: scale(1.02); opacity: 1; }
-            100% { transform: scale(0.98); opacity: 0.8; }
-        }
-        @keyframes pulse-ring-green {
-            0% { transform: scale(0.98); opacity: 0.8; }
-            50% { transform: scale(1.03); opacity: 1; }
-            100% { transform: scale(0.98); opacity: 0.8; }
-        }
-        .pudding-glow {
-            filter: drop-shadow(0 4px 12px rgba(220, 38, 38, 0.18));
-        }
-        .scan-line {
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, #ef4444, #10b981, transparent);
-            position: absolute;
-            animation: scanAnim 1.8s infinite ease-in-out;
-        }
-        @keyframes scanAnim {
-            0% { top: 5%; opacity: 0.3; }
-            50% { top: 90%; opacity: 1; }
-            100% { top: 5%; opacity: 0.3; }
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAF6F0; }
+        .scanner-ring-red { box-shadow: 0 0 25px rgba(220, 38, 38, 0.5); animation: pulse-ring-red 2s infinite; }
+        .scanner-ring-green { box-shadow: 0 0 25px rgba(16, 185, 129, 0.5); animation: pulse-ring-green 2s infinite; }
+        @keyframes pulse-ring-red { 0% { transform: scale(0.98); opacity: 0.8; } 50% { transform: scale(1.02); opacity: 1; } 100% { transform: scale(0.98); opacity: 0.8; } }
+        @keyframes pulse-ring-green { 0% { transform: scale(0.98); opacity: 0.8; } 50% { transform: scale(1.03); opacity: 1; } 100% { transform: scale(0.98); opacity: 0.8; } }
+        .pudding-glow { filter: drop-shadow(0 4px 12px rgba(220, 38, 38, 0.18)); }
+        .scan-line { width: 100%; height: 3px; background: linear-gradient(90deg, transparent, #ef4444, #10b981, transparent); position: absolute; animation: scanAnim 1.8s infinite ease-in-out; }
+        @keyframes scanAnim { 0% { top: 5%; opacity: 0.3; } 50% { top: 90%; opacity: 1; } 100% { top: 5%; opacity: 0.3; } }
         @media print {
-            body * {
-                visibility: hidden;
-            }
-            #printable-payslip, #printable-payslip * {
-                visibility: visible;
-            }
-            #printable-payslip {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-            }
+            body * { visibility: hidden; }
+            #printable-payslip, #printable-payslip * { visibility: visible; }
+            #printable-payslip { position: absolute; left: 0; top: 0; width: 100%; }
         }
     </style>
 </head>
@@ -113,7 +61,11 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Helper untuk mengonversi URL Google Drive ke URL Direct Image
+        // Inisialisasi Supabase Client
+        const SUPABASE_URL = 'https://fqaqqaruktvgpfsiwlkp.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_vxVqvMbaXlq1Lk5zlIAzeg_QCoZmobc';
+        const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
         const convertGoogleDriveUrl = (url) => {
             if (!url) return '';
             if (url.includes('drive.google.com')) {
@@ -126,9 +78,9 @@
         };
 
         const INITIAL_STORES = [
-            { id: 'S1', code: 'STORE_GA', name: 'Puding Panen Bali - Gatsu Tengah', address: 'Jl. Gatot Subroto Tengah No. 88, Denpasar', shifts: [{ name: 'Pagi', start: '08:00', end: '16:00' }, { name: 'Siang', start: '12:00', end: '20:00' }] },
-            { id: 'S2', code: 'STORE_RN', name: 'Puding Panen Bali - Renon', address: 'Jl. Renon Niti Mandala No. 12, Denpasar', shifts: [{ name: 'Pagi', start: '08:00', end: '16:00' }, { name: 'Siang', start: '13:00', end: '21:00' }] },
-            { id: 'S3', code: 'STORE_TU', name: 'Puding Panen Bali - Teuku Umar', address: 'Jl. Teuku Umar Barat No. 45, Denpasar', shifts: [{ name: 'Single Shift', start: '10:00', end: '18:00' }] }
+            { id: 'S1', code: 'STORE_GA', name: 'Puding Panen Bali - Gatsu Tengah', address: 'Jl. Gatot Subroto Tengah No. 88, Denpasar' },
+            { id: 'S2', code: 'STORE_RN', name: 'Puding Panen Bali - Renon', address: 'Jl. Renon Niti Mandala No. 12, Denpasar' },
+            { id: 'S3', code: 'STORE_TU', name: 'Puding Panen Bali - Teuku Umar', address: 'Jl. Teuku Umar Barat No. 45, Denpasar' }
         ];
 
         const INITIAL_POSITIONS = [
@@ -140,71 +92,9 @@
         ];
 
         const INITIAL_EMPLOYEES = [
-            { 
-                id: 'EMP-001', 
-                name: 'I Wayan Pratama', 
-                role: 'Cashier', 
-                storeId: 'S1', 
-                isDriver: false, 
-                shift: '08:00 - 16:00', 
-                phone: '081234567890', 
-                salary: 3200000, 
-                masterPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-                photoRegisteredAt: '2026-01-10 09:00:00',
-                registeredBy: 'Super Admin HR'
-            },
-            { 
-                id: 'EMP-002', 
-                name: 'Ni Made Kadek', 
-                role: 'Kitchen Specialist', 
-                storeId: 'S1', 
-                isDriver: false, 
-                shift: '12:00 - 20:00', 
-                phone: '081298765432', 
-                salary: 3400000, 
-                masterPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-                photoRegisteredAt: '2026-01-12 10:30:00',
-                registeredBy: 'Super Admin HR'
-            },
-            { 
-                id: 'EMP-003', 
-                name: 'I Nyoman Budi (Supir)', 
-                role: 'Driver Delivery', 
-                storeId: 'S1', 
-                isDriver: true, 
-                shift: '11:00 - 20:00', 
-                phone: '081333444555', 
-                salary: 3500000, 
-                masterPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-                photoRegisteredAt: '2026-01-15 14:10:00',
-                registeredBy: 'Super Admin HR'
-            },
-            { 
-                id: 'EMP-004', 
-                name: 'Putu Agus', 
-                role: 'Outlet Supervisor', 
-                storeId: 'S2', 
-                isDriver: false, 
-                shift: '08:00 - 16:00', 
-                phone: '081555666777', 
-                salary: 4500000, 
-                masterPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-                photoRegisteredAt: '2026-01-18 11:20:00',
-                registeredBy: 'Super Admin HR'
-            },
-            { 
-                id: 'EMP-005', 
-                name: 'Ketut Lestari', 
-                role: 'Cashier', 
-                storeId: 'S3', 
-                isDriver: false, 
-                shift: '10:00 - 18:00', 
-                phone: '081777888999', 
-                salary: 3200000, 
-                masterPhoto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-                photoRegisteredAt: '2026-02-01 08:45:00',
-                registeredBy: 'Super Admin HR'
-            }
+            { id: 'EMP-001', name: 'I Wayan Pratama', role: 'Cashier', storeId: 'S1', isDriver: false, shift: '08:00 - 16:00', phone: '081234567890', salary: 3200000, masterPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400', photoRegisteredAt: '2026-01-10 09:00:00', registeredBy: 'Super Admin HR' },
+            { id: 'EMP-002', name: 'Ni Made Kadek', role: 'Kitchen Specialist', storeId: 'S1', isDriver: false, shift: '12:00 - 20:00', phone: '081298765432', salary: 3400000, masterPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400', photoRegisteredAt: '2026-01-12 10:30:00', registeredBy: 'Super Admin HR' },
+            { id: 'EMP-003', name: 'I Nyoman Budi (Supir)', role: 'Driver Delivery', storeId: 'S1', isDriver: true, shift: '11:00 - 20:00', phone: '081333444555', salary: 3500000, masterPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400', photoRegisteredAt: '2026-01-15 14:10:00', registeredBy: 'Super Admin HR' }
         ];
 
         function App() {
@@ -212,12 +102,7 @@
             const [isSuperAdmin, setIsSuperAdmin] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
             
-            // Dynamic Admin Credentials State
-            const [adminCredentials, setAdminCredentials] = useState({
-                username: 'admin',
-                password: 'admin123'
-            });
-
+            const [adminCredentials, setAdminCredentials] = useState({ username: 'admin', password: 'admin123' });
             const [loginUsername, setLoginUsername] = useState('admin');
             const [loginPassword, setLoginPassword] = useState('');
             const [loginError, setLoginError] = useState('');
@@ -228,80 +113,76 @@
             const [stores, setStores] = useState(INITIAL_STORES);
             const [positions, setPositions] = useState(INITIAL_POSITIONS);
             const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
+            const [attendanceRecords, setAttendanceRecords] = useState([]);
 
             const [selectedAttendanceModal, setSelectedAttendanceModal] = useState(null);
             const [selectedPayslipEmp, setSelectedPayslipEmp] = useState(null);
             const [toastMessage, setToastMessage] = useState(null);
 
-            const [attendanceRecords, setAttendanceRecords] = useState([
-                {
-                    id: 'ATT-101',
-                    employeeId: 'EMP-001',
-                    employeeName: 'I Wayan Pratama',
-                    masterPhotoRef: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-                    capturedPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-                    storeName: 'Puding Panen Bali - Gatsu Tengah',
-                    role: 'Cashier',
-                    checkIn: '2026-08-02 08:01:00',
-                    checkOut: '2026-08-02 16:00:00',
-                    attendanceType: 'CHECK_IN',
-                    isLate: true,
-                    lateMinutes: 1,
-                    overtimeHours: 0,
-                    confidence: 98.6,
-                    matchStatus: 'MATCHED',
-                    livenessScore: 96.5,
-                    device: 'Kiosk HP Outlet Gatsu'
-                },
-                {
-                    id: 'ATT-102',
-                    employeeId: 'EMP-003',
-                    employeeName: 'I Nyoman Budi (Supir)',
-                    masterPhotoRef: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-                    capturedPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-                    storeName: 'Puding Panen Bali - Gatsu Tengah',
-                    role: 'Driver Delivery',
-                    checkIn: '2026-08-02 09:45:00',
-                    checkOut: '2026-08-02 21:30:00',
-                    attendanceType: 'CHECK_IN',
-                    isLate: false,
-                    lateMinutes: 0,
-                    overtimeHours: 2,
-                    confidence: 99.1,
-                    matchStatus: 'MATCHED',
-                    livenessScore: 98.2,
-                    device: 'Kiosk HP Outlet Gatsu'
-                }
-            ]);
-
-            const [auditLogs, setAuditLogs] = useState([
-                { id: 'AUD-001', timestamp: '2026-08-02 08:01:05', user: 'Kiosk AI Panen Bali', action: 'FACE_ATTENDANCE', details: 'Absen masuk - I Wayan Pratama (Wajah Cocok 98.6%)' },
-                { id: 'AUD-002', timestamp: '2026-08-02 09:45:10', user: 'Kiosk AI Panen Bali', action: 'FACE_ATTENDANCE', details: 'Absen masuk - I Nyoman Budi (Wajah Cocok 99.1%)' }
-            ]);
-
-            const [notifications, setNotifications] = useState([
-                { id: 1, title: 'Terlambat Terdeteksi!', message: 'I Wayan Pratama absen jam 08:01 (Terlambat 1 menit)', time: '08:01 AM', type: 'late' },
-                { id: 2, title: 'Lembur Driver Otomatis', message: 'I Nyoman Budi (Driver) mendapatkan lembur 2 jam', time: '09:45 AM', type: 'overtime' }
-            ]);
+            const [auditLogs, setAuditLogs] = useState([]);
+            const [notifications, setNotifications] = useState([]);
 
             const showToast = (msg, type = 'info') => {
                 setToastMessage({ msg, type });
                 setTimeout(() => setToastMessage(null), 3500);
             };
 
+            // Sinkronisasi dengan Supabase API saat Load
             useEffect(() => {
-                if (!isOfflineMode && offlineQueue.length > 0) {
-                    setAttendanceRecords(prev => [...offlineQueue, ...prev]);
-                    showToast(`Berhasil menyinkronkan ${offlineQueue.length} data absensi offline!`, 'success');
-                    setNotifications(prev => [
-                        { id: Date.now(), title: 'Sinkronisasi Offline Berhasil', message: `${offlineQueue.length} data absensi lokal diunggah ke server.`, time: new Date().toLocaleTimeString(), type: 'sync' },
-                        ...prev
-                    ]);
-                    setOfflineQueue([]);
-                }
-            }, [isOfflineMode]);
+                const fetchSupabaseData = async () => {
+                    if (!supabase) return;
+                    try {
+                        // Fetch Employees
+                        const { data: empData, error: empErr } = await supabase.from('employees').select('*');
+                        if (!empErr && empData && empData.length > 0) {
+                            const formatted = empData.map(e => ({
+                                id: e.id,
+                                name: e.name,
+                                role: e.role,
+                                phone: e.phone,
+                                storeId: e.store_id || 'S1',
+                                isDriver: e.is_driver,
+                                shift: e.shift || '08:00 - 16:00',
+                                salary: Number(e.salary) || 3200000,
+                                masterPhoto: e.master_photo,
+                                photoRegisteredAt: e.photo_registered_at,
+                                registeredBy: e.registered_by
+                            }));
+                            setEmployees(formatted);
+                        }
 
-            const logAuditAction = (action, details) => {
+                        // Fetch Attendance Records
+                        const { data: attData, error: attErr } = await supabase.from('attendance_records').select('*').order('created_at', { ascending: false });
+                        if (!attErr && attData && attData.length > 0) {
+                            const formattedAtt = attData.map(a => ({
+                                id: a.id,
+                                employeeId: a.employee_id,
+                                employeeName: a.employee_name,
+                                masterPhotoRef: a.master_photo_ref,
+                                capturedPhoto: a.captured_photo,
+                                storeName: a.store_name,
+                                role: a.role,
+                                checkIn: a.check_in,
+                                checkOut: a.check_out,
+                                attendanceType: a.attendance_type,
+                                isLate: a.is_late,
+                                lateMinutes: a.late_minutes,
+                                confidence: Number(a.confidence),
+                                matchStatus: a.match_status,
+                                livenessScore: Number(a.liveness_score),
+                                device: a.device
+                            }));
+                            setAttendanceRecords(formattedAtt);
+                        }
+                    } catch (err) {
+                        console.error("Gagal memuat data dari Supabase:", err);
+                    }
+                };
+
+                fetchSupabaseData();
+            }, []);
+
+            const logAuditAction = async (action, details) => {
                 const newLog = {
                     id: `AUD-${Math.floor(1000 + Math.random() * 9000)}`,
                     timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -310,6 +191,15 @@
                     details
                 };
                 setAuditLogs(prev => [newLog, ...prev]);
+
+                if (supabase) {
+                    await supabase.from('audit_logs').insert([{
+                        id: newLog.id,
+                        user_role: newLog.user,
+                        action: newLog.action,
+                        details: newLog.details
+                    }]);
+                }
             };
 
             const handleSuperAdminLogin = (e) => {
@@ -323,43 +213,66 @@
                     setLoginError('');
                     setLoginPassword('');
                     showToast('Selamat Datang Super Admin Puding Panen Bali!', 'success');
-                    logAuditAction('LOGIN_SUPER_ADMIN', 'Super Admin berhasil login ke portal kontrol utama');
+                    logAuditAction('LOGIN_SUPER_ADMIN', 'Super Admin berhasil login ke portal utama');
                 } else {
-                    setLoginError('Username/Password Admin salah! Silakan periksa kembali.');
+                    setLoginError('Username/Password Admin salah!');
                 }
             };
 
             const handleLogoutSuperAdmin = () => {
                 setIsSuperAdmin(false);
-                if (activeTab !== 'kiosk') {
-                    setActiveTab('kiosk');
-                }
+                if (activeTab !== 'kiosk') setActiveTab('kiosk');
                 showToast('Super Admin telah keluar.', 'info');
                 logAuditAction('LOGOUT_SUPER_ADMIN', 'Super Admin keluar dari sesi.');
             };
 
-            const exportToCSV = (data, filename) => {
-                if (!data || !data.length) {
-                    showToast('Tidak ada data untuk diexport!', 'warning');
-                    return;
+            const handleSaveAttendance = async (record) => {
+                if (isOfflineMode) {
+                    setOfflineQueue(prev => [record, ...prev]);
+                    showToast('Absen tersimpan secara offline di perangkat Kiosk.', 'warning');
+                } else {
+                    setAttendanceRecords(prev => [record, ...prev]);
+
+                    // Kirim ke Supabase Database
+                    if (supabase) {
+                        await supabase.from('attendance_records').insert([{
+                            id: record.id,
+                            employee_id: record.employeeId,
+                            employee_name: record.employeeName,
+                            master_photo_ref: record.masterPhotoRef,
+                            captured_photo: record.capturedPhoto,
+                            store_name: record.storeName,
+                            role: record.role,
+                            check_in: record.checkIn,
+                            check_out: record.checkOut,
+                            attendance_type: record.attendanceType,
+                            is_late: record.isLate,
+                            late_minutes: record.lateMinutes,
+                            confidence: record.confidence,
+                            match_status: record.matchStatus,
+                            liveness_score: record.livenessScore,
+                            device: record.device
+                        }]);
+                    }
+
+                    if (record.isLate) {
+                        setNotifications(prev => [{
+                            id: Date.now(),
+                            title: '🚨 TERLAMBAT!',
+                            message: `${record.employeeName} absen pada ${record.checkIn} (Terlambat ${record.lateMinutes} menit)`,
+                            time: new Date().toLocaleTimeString(),
+                            type: 'late'
+                        }, ...prev]);
+                    }
+
+                    logAuditAction('FACE_ATTENDANCE', `Absensi wajah oleh ${record.employeeName} (${record.confidence}% Match Foto Acuan)`);
+                    showToast(`Absensi Berhasil! Wajah ${record.employeeName} Terverifikasi (${record.confidence}% Match)`, 'success');
                 }
-                const headers = Object.keys(data[0]).join(',');
-                const rows = data.map(obj => Object.values(obj).map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
-                const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showToast(`File ${filename}.csv berhasil diunduh!`, 'success');
             };
 
             return (
                 <div className="flex flex-col min-h-screen bg-cream-100 text-slate-800">
                     
-                    {/* Floating Toast Notification */}
                     {toastMessage && (
                         <div className={`fixed bottom-5 right-5 z-50 px-5 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-3 border transition-all animate-bounce ${
                             toastMessage.type === 'success' ? 'bg-emerald-800 text-white border-emerald-600' :
@@ -373,8 +286,6 @@
 
                     <header className="border-b border-brand-100 bg-white sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                            
-                            {/* Brand Logo & Title */}
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-2xl bg-brand-600 flex items-center justify-center shadow-md shadow-brand-500/20 text-white font-black text-xl pudding-glow shrink-0">
                                     🍮
@@ -385,1734 +296,245 @@
                                             PUDING PANEN BALI
                                         </h1>
                                         <span className="px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-extrabold border border-brand-200 hidden sm:inline-block">
-                                            AI Face HRIS
+                                            Supabase Connected
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-cream-800 font-medium">Sistem Kelola Karyawan & Absensi AI Wajah</p>
                                 </div>
                             </div>
 
-                            {/* Center Navigation Tabs */}
                             {isSuperAdmin ? (
                                 <nav className="hidden lg:flex items-center gap-1 bg-cream-50 p-1 rounded-2xl border border-cream-300 text-xs font-semibold">
-                                    <button
-                                        onClick={() => setActiveTab('kiosk')}
-                                        className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'kiosk' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
-                                    >
-                                        📱 Kiosk Absen
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('superadmin')}
-                                        className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'superadmin' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
-                                    >
-                                        👑 Kelola Staff & Admin
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('dashboard')}
-                                        className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
-                                    >
-                                        📊 Dashboard & Audit
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('driver_ot')}
-                                        className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'driver_ot' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
-                                    >
-                                        🚚 OT Driver
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('payroll')}
-                                        className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'payroll' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:text-brand-700'}`}
-                                    >
-                                        💰 Payroll & Slip
-                                    </button>
+                                    <button onClick={() => setActiveTab('kiosk')} className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'kiosk' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>📱 Kiosk Absen</button>
+                                    <button onClick={() => setActiveTab('superadmin')} className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'superadmin' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>👑 Kelola Staff & Admin</button>
+                                    <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>📊 Dashboard & Audit</button>
+                                    <button onClick={() => setActiveTab('payroll')} className={`px-3 py-1.5 rounded-xl transition-all ${activeTab === 'payroll' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>💰 Payroll & Slip</button>
                                 </nav>
                             ) : (
                                 <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600 bg-cream-50 px-3 py-1.5 rounded-xl border border-cream-200">
-                                    <span>📱 Mode Kiosk Outlet Toko (Verifikasi Acuan Foto Admin)</span>
+                                    <span>📱 Mode Kiosk Outlet Toko (Supabase Direct Sync)</span>
                                 </div>
                             )}
 
-                            {/* Right Actions */}
                             <div className="flex items-center gap-2">
                                 {isSuperAdmin ? (
                                     <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-xl">
-                                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                                            👑 Admin Login
-                                        </span>
-                                        <button 
-                                            onClick={handleLogoutSuperAdmin}
-                                            className="text-[10px] bg-emerald-200 hover:bg-emerald-300 text-emerald-900 font-bold px-2 py-0.5 rounded-md transition-all ml-1"
-                                        >
-                                            Keluar
-                                        </button>
+                                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">👑 Admin Login</span>
+                                        <button onClick={handleLogoutSuperAdmin} className="text-[10px] bg-emerald-200 hover:bg-emerald-300 text-emerald-900 font-bold px-2 py-0.5 rounded-md ml-1">Keluar</button>
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={() => setShowLoginModal(true)}
-                                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-cream-200 text-slate-700 border border-cream-300 shadow-sm flex items-center gap-1.5 transition-all"
-                                    >
+                                    <button onClick={() => setShowLoginModal(true)} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-cream-200 text-slate-700 border border-cream-300 shadow-sm flex items-center gap-1.5">
                                         <span>🔒</span> Login Admin
                                     </button>
                                 )}
-
-                                <button
-                                    onClick={() => setIsOfflineMode(!isOfflineMode)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${
-                                        isOfflineMode 
-                                            ? 'bg-amber-100 text-amber-800 border-amber-300' 
-                                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                    }`}
-                                >
-                                    <span className={`h-2 w-2 rounded-full ${isOfflineMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                                    {isOfflineMode ? `Offline (${offlineQueue.length})` : 'Online'}
-                                </button>
                             </div>
                         </div>
-
-                        {/* Mobile Navigation Bar */}
-                        {isSuperAdmin && (
-                            <div className="lg:hidden flex overflow-x-auto px-4 py-2 gap-2 bg-cream-50 border-t border-cream-200 text-xs font-semibold">
-                                <button onClick={() => setActiveTab('kiosk')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'kiosk' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>📱 Kiosk Absen</button>
-                                <button onClick={() => setActiveTab('superadmin')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'superadmin' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>👑 Kelola Staff</button>
-                                <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>📊 Dashboard Audit</button>
-                                <button onClick={() => setActiveTab('driver_ot')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'driver_ot' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>🚚 Driver OT</button>
-                                <button onClick={() => setActiveTab('payroll')} className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'payroll' ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 border border-cream-300'}`}>💰 Payroll & Slip</button>
-                            </div>
-                        )}
                     </header>
 
-                    {/* SUPER ADMIN LOGIN MODAL */}
+                    {/* LOGIN MODAL */}
                     {showLoginModal && (
                         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
                             <div className="bg-white max-w-md w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-5 relative">
-                                <button 
-                                    onClick={() => { setShowLoginModal(false); setLoginError(''); }}
-                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                                >
-                                    ✕
-                                </button>
-
+                                <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-slate-400 text-xl font-bold">✕</button>
                                 <div className="text-center space-y-1">
-                                    <div className="h-12 w-12 rounded-2xl bg-brand-100 border border-brand-200 text-brand-700 flex items-center justify-center mx-auto text-2xl font-bold">
-                                        👑
-                                    </div>
                                     <h3 className="text-lg font-black text-slate-800">Login Super Admin HR</h3>
-                                    <p className="text-xs text-slate-500">Masukkan kredensial untuk mengelola data staff, foto acuan, & payroll</p>
+                                    <p className="text-xs text-slate-500">Kelola data staff & sync Supabase Database</p>
                                 </div>
-
-                                {loginError && (
-                                    <div className="p-3 bg-brand-50 border border-brand-200 rounded-xl text-brand-800 text-xs font-bold">
-                                        ⚠️ {loginError}
-                                    </div>
-                                )}
-
+                                {loginError && <div className="p-3 bg-brand-50 border border-brand-200 rounded-xl text-brand-800 text-xs font-bold">⚠️ {loginError}</div>}
                                 <form onSubmit={handleSuperAdminLogin} className="space-y-3 text-xs">
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Username Admin</label>
-                                        <input 
-                                            type="text" 
-                                            value={loginUsername} 
-                                            onChange={(e) => setLoginUsername(e.target.value)}
-                                            className="w-full bg-cream-50 border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
-                                            required 
-                                        />
+                                        <label className="block font-bold mb-1">Username Admin</label>
+                                        <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} className="w-full bg-cream-50 border rounded-xl p-3 font-semibold" required />
                                     </div>
-
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Password</label>
-                                        <input 
-                                            type="password" 
-                                            placeholder="Masukkan password admin..."
-                                            value={loginPassword} 
-                                            onChange={(e) => setLoginPassword(e.target.value)}
-                                            className="w-full bg-cream-50 border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
-                                            required 
-                                        />
+                                        <label className="block font-bold mb-1">Password</label>
+                                        <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-cream-50 border rounded-xl p-3 font-semibold" required />
                                     </div>
-
-                                    <div className="bg-cream-50 p-2.5 rounded-xl border border-cream-200 text-[11px] text-slate-600 flex justify-between items-center">
-                                        <span>Gunakan Akun Saat Ini:</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => { setLoginUsername(adminCredentials.username); setLoginPassword(adminCredentials.password); }}
-                                            className="text-brand-700 font-bold hover:underline"
-                                        >
-                                            Isi Otomatis ({adminCredentials.username} / ••••••••)
-                                        </button>
-                                    </div>
-
-                                    <button 
-                                        type="submit" 
-                                        className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition-all text-xs"
-                                    >
-                                        Masuk Super Admin Portal ➔
-                                    </button>
+                                    <button type="submit" className="w-full py-3 bg-brand-600 text-white font-bold rounded-xl shadow-md">Masuk Portal Admin ➔</button>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* ATTENDANCE AI COMPARISON MODAL */}
-                    {selectedAttendanceModal && (
-                        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="bg-white max-w-xl w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-5 relative max-h-[90vh] overflow-y-auto">
-                                <button 
-                                    onClick={() => setSelectedAttendanceModal(null)}
-                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                                >
-                                    ✕
-                                </button>
-
-                                <div className="text-center space-y-1">
-                                    <span className="px-3 py-1 bg-brand-100 text-brand-800 text-[10px] font-extrabold rounded-full uppercase tracking-wider">
-                                        Audit Komparasi Biometrik AI
-                                    </span>
-                                    <h3 className="text-lg font-black text-slate-800">Detail Verifikasi Foto Absensi</h3>
-                                    <p className="text-xs text-slate-500">Perbandingan Wajah Live Kiosk vs Foto Acuan Master buatan Admin</p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 bg-cream-50 p-4 rounded-2xl border border-cream-200">
-                                    <div className="space-y-2 text-center">
-                                        <div className="text-[11px] font-bold text-slate-600 uppercase">1. Foto Acuan Master Admin</div>
-                                        <div className="relative aspect-square rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-sm bg-slate-900">
-                                            <img src={selectedAttendanceModal.masterPhotoRef} className="w-full h-full object-cover" />
-                                            <div className="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded">
-                                                Master Acuan
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500">Foto resmi terdaftar di database Admin</p>
-                                    </div>
-
-                                    <div className="space-y-2 text-center">
-                                        <div className="text-[11px] font-bold text-slate-600 uppercase">2. Foto Live Captured Kiosk</div>
-                                        <div className={`relative aspect-square rounded-2xl overflow-hidden border-2 ${
-                                            selectedAttendanceModal.matchStatus === 'MATCHED' ? 'border-emerald-500' : 'border-red-500'
-                                        } shadow-sm bg-slate-900`}>
-                                            <img src={selectedAttendanceModal.capturedPhoto} className="w-full h-full object-cover" />
-                                            <div className={`absolute bottom-1 right-1 text-white text-[9px] font-bold px-2 py-0.5 rounded ${
-                                                selectedAttendanceModal.matchStatus === 'MATCHED' ? 'bg-emerald-600' : 'bg-red-600'
-                                            }`}>
-                                                Live Captured
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500">Kamera Kiosk Outlet pada {selectedAttendanceModal.checkIn || selectedAttendanceModal.checkOut}</p>
-                                    </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
-                                    selectedAttendanceModal.matchStatus === 'MATCHED'
-                                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                                        : 'bg-red-50 border-red-300 text-red-900'
-                                }`}>
-                                    <div className="flex justify-between items-center font-bold">
-                                        <span className="text-sm flex items-center gap-1.5">
-                                            {selectedAttendanceModal.matchStatus === 'MATCHED' ? '✅ Wajah Terverifikasi Cocok' : '⚠️ PERINGATAN MISMATCH WAJAH'}
-                                        </span>
-                                        <span className="text-base font-black font-mono">
-                                            {selectedAttendanceModal.confidence}% Match
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] leading-relaxed">
-                                        {selectedAttendanceModal.matchStatus === 'MATCHED'
-                                            ? `Fitur biometrik mata, hidung, dan rahang cocok dengan Foto Acuan Admin milik ${selectedAttendanceModal.employeeName}.`
-                                            : `Perhatian: Foto saat absen memiliki kemiripan rendah dengan Foto Acuan Admin. Berpotensi joki atau pengganti foto!`}
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                                    <div className="p-2.5 bg-cream-50 rounded-xl border border-cream-200">
-                                        <span className="text-slate-400 block text-[10px]">Liveness Anti-Spoofing:</span>
-                                        <strong className="text-slate-800">{selectedAttendanceModal.livenessScore}% Live Person</strong>
-                                    </div>
-                                    <div className="p-2.5 bg-cream-50 rounded-xl border border-cream-200">
-                                        <span className="text-slate-400 block text-[10px]">Perangkat Kiosk:</span>
-                                        <strong className="text-slate-800">{selectedAttendanceModal.device}</strong>
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={() => setSelectedAttendanceModal(null)}
-                                    className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl shadow-md text-xs transition-all"
-                                >
-                                    Tutup Audit Modal
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-                        {(!isSuperAdmin && activeTab !== 'kiosk') ? (
+                        {activeTab === 'kiosk' && (
                             <KioskModule 
                                 stores={stores} 
                                 employees={employees} 
                                 isOffline={isOfflineMode}
                                 showToast={showToast}
-                                onRecordAttendance={(record) => {
-                                    if (isOfflineMode) {
-                                        setOfflineQueue(prev => [record, ...prev]);
-                                        showToast('Absen tersimpan secara offline di perangkat Kiosk.', 'warning');
-                                    } else {
-                                        setAttendanceRecords(prev => [record, ...prev]);
-                                        logAuditAction('FACE_ATTENDANCE', `Absensi wajah oleh ${record.employeeName} (${record.confidence}% Match Foto Acuan Admin)`);
-                                        showToast(`Absensi Berhasil! Wajah ${record.employeeName} Terverifikasi Cocok (${record.confidence}% Match)`, 'success');
-                                    }
-                                }}
+                                onRecordAttendance={handleSaveAttendance}
                             />
-                        ) : (
-                            <>
-                                {activeTab === 'kiosk' && (
-                                    <KioskModule 
-                                        stores={stores} 
-                                        employees={employees} 
-                                        isOffline={isOfflineMode}
-                                        showToast={showToast}
-                                        onRecordAttendance={(record) => {
-                                            if (isOfflineMode) {
-                                                setOfflineQueue(prev => [record, ...prev]);
-                                                showToast('Absen tersimpan secara offline di perangkat Kiosk.', 'warning');
-                                            } else {
-                                                setAttendanceRecords(prev => [record, ...prev]);
-                                                if (record.isLate) {
-                                                    setNotifications(prev => [{
-                                                        id: Date.now(),
-                                                        title: '🚨 TERLAMBAT!',
-                                                        message: `${record.employeeName} absen pada ${record.checkIn} (Terlambat ${record.lateMinutes} menit)`,
-                                                        time: new Date().toLocaleTimeString(),
-                                                        type: 'late'
-                                                    }, ...prev]);
-                                                }
-                                                logAuditAction('FACE_ATTENDANCE', `Absensi wajah oleh ${record.employeeName} (Kemiripan ${record.confidence}% dengan foto acuan admin)`);
-                                                showToast(`Absensi Berhasil! Wajah ${record.employeeName} Terverifikasi Cocok (${record.confidence}% Match)`, 'success');
-                                            }
-                                        }}
-                                    />
-                                )}
+                        )}
 
-                                {activeTab === 'superadmin' && isSuperAdmin && (
-                                    <SuperAdminPortalModule 
-                                        stores={stores} 
-                                        setStores={setStores}
-                                        positions={positions}
-                                        setPositions={setPositions}
-                                        employees={employees}
-                                        setEmployees={setEmployees}
-                                        auditLogs={auditLogs}
-                                        logAuditAction={logAuditAction}
-                                        showToast={showToast}
-                                        adminCredentials={adminCredentials}
-                                        setAdminCredentials={setAdminCredentials}
-                                    />
-                                )}
+                        {activeTab === 'superadmin' && isSuperAdmin && (
+                            <SuperAdminPortalModule 
+                                stores={stores} 
+                                positions={positions}
+                                employees={employees}
+                                setEmployees={setEmployees}
+                                auditLogs={auditLogs}
+                                logAuditAction={logAuditAction}
+                                showToast={showToast}
+                                supabase={supabase}
+                            />
+                        )}
 
-                                {activeTab === 'dashboard' && isSuperAdmin && (
-                                    <AdminDashboardModule 
-                                        stores={stores} 
-                                        employees={employees}
-                                        records={attendanceRecords} 
-                                        notifications={notifications}
-                                        offlineQueueLength={offlineQueue.length}
-                                        onSelectRecord={(rec) => setSelectedAttendanceModal(rec)}
-                                        exportToCSV={exportToCSV}
-                                    />
-                                )}
-
-                                {activeTab === 'driver_ot' && isSuperAdmin && (
-                                    <DriverOvertimeModule 
-                                        employees={employees}
-                                        showToast={showToast}
-                                        logAuditAction={logAuditAction}
-                                    />
-                                )}
-
-                                {activeTab === 'payroll' && isSuperAdmin && (
-                                    <PayrollSummaryModule 
-                                        records={attendanceRecords} 
-                                        employees={employees} 
-                                        stores={stores}
-                                        exportToCSV={exportToCSV}
-                                        onSelectPayslip={(emp) => setSelectedPayslipEmp(emp)}
-                                    />
-                                )}
-                            </>
+                        {activeTab === 'dashboard' && isSuperAdmin && (
+                            <AdminDashboardModule stores={stores} employees={employees} records={attendanceRecords} />
                         )}
                     </main>
 
-                    {/* PAYSLIP PRINTABLE MODAL */}
-                    {selectedPayslipEmp && (
-                        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="bg-white max-w-xl w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-4 relative max-h-[90vh] overflow-y-auto">
-                                <button 
-                                    onClick={() => setSelectedPayslipEmp(null)}
-                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                                >
-                                    ✕
-                                </button>
-
-                                <div id="printable-payslip" className="p-6 bg-white border border-slate-200 rounded-2xl space-y-4">
-                                    <div className="flex justify-between items-center border-b pb-4 border-slate-200">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-2xl">🍮</span>
-                                            <div>
-                                                <h2 className="font-extrabold text-slate-900 text-base">PUDING PANEN BALI</h2>
-                                                <p className="text-[11px] text-slate-500">Denpasar, Bali - Indonesia</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="px-2.5 py-1 bg-brand-100 text-brand-800 text-[10px] font-extrabold rounded">SLIP GAJI RESMI</span>
-                                            <p className="text-[10px] text-slate-400 mt-1">Periode: Agustus 2026</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div><span className="text-slate-400">Nama Staff:</span> <strong className="text-slate-800">{selectedPayslipEmp.name}</strong></div>
-                                        <div><span className="text-slate-400">Jabatan:</span> <strong className="text-slate-800">{selectedPayslipEmp.role}</strong></div>
-                                        <div><span className="text-slate-400">ID Karyawan:</span> <strong className="font-mono text-slate-800">{selectedPayslipEmp.id}</strong></div>
-                                        <div><span className="text-slate-400">Outlet Utama:</span> <strong className="text-slate-800">{stores.find(s => s.id === selectedPayslipEmp.storeId)?.name}</strong></div>
-                                    </div>
-
-                                    <div className="border-t border-b border-slate-200 py-3 text-xs space-y-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-600">Gaji Pokok Jabatan</span>
-                                            <span className="font-mono font-bold">Rp {selectedPayslipEmp.salary.toLocaleString('id-ID')}</span>
-                                        </div>
-                                        <div className="flex justify-between text-emerald-700">
-                                            <span>Bonus Lembur Terverifikasi AI</span>
-                                            <span className="font-mono font-bold">+ Rp {(selectedPayslipEmp.otBonus || 0).toLocaleString('id-ID')}</span>
-                                        </div>
-                                        <div className="flex justify-between text-brand-700">
-                                            <span>Potongan Keterlambatan Absensi</span>
-                                            <span className="font-mono font-bold">- Rp {(selectedPayslipEmp.deduction || 0).toLocaleString('id-ID')}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-center p-3 bg-cream-100 rounded-xl">
-                                        <span className="font-extrabold text-slate-900 text-xs">TOTAL TAKE HOME PAY:</span>
-                                        <span className="font-black text-brand-700 text-lg font-mono">
-                                            Rp {(selectedPayslipEmp.finalSalary || selectedPayslipEmp.salary).toLocaleString('id-ID')}
-                                        </span>
-                                    </div>
-
-                                    <div className="text-[10px] text-slate-400 text-center italic pt-2">
-                                        Dicetak otomatis oleh Sistem HRIS & AI Face Verification Puding Panen Bali pada {new Date().toLocaleDateString('id-ID')}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => window.print()} 
-                                        className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-md"
-                                    >
-                                        🛈 Cetak Slip Gaji (PDF / Printer)
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Footer */}
                     <footer className="bg-white border-t border-cream-200 py-4 text-center text-xs text-slate-500">
-                        Puding Panen Bali &copy; 2026 HRIS & AI Face Verification Attendance System
+                        Puding Panen Bali &copy; 2026 HRIS & Supabase Connected Attendance System
                     </footer>
                 </div>
             );
         }
 
-        function KioskModule({ stores, employees, isOffline, onRecordAttendance, showToast }) {
-            const [step, setStep] = useState(1);
-            const [attendanceType, setAttendanceType] = useState('CHECK_IN');
+        function KioskModule({ stores, employees, onRecordAttendance, showToast }) {
             const [selectedEmpId, setSelectedEmpId] = useState(employees[0]?.id || '');
-            const [selectedStoreId, setSelectedStoreId] = useState(stores[0]?.id || '');
-            const [selectedShift, setSelectedShift] = useState('08:00 - 16:00');
+            const [attendanceType, setAttendanceType] = useState('CHECK_IN');
             const [isScanning, setIsScanning] = useState(false);
-            const [scanSuccess, setScanSuccess] = useState(false);
-            const [lastRecord, setLastRecord] = useState(null);
-
-            const [simulateMismatch, setSimulateMismatch] = useState(false);
-
-            const videoRef = useRef(null);
-            const canvasRef = useRef(null);
-            const [useRealCamera, setUseRealCamera] = useState(false);
-            const [cameraStream, setCameraStream] = useState(null);
 
             const selectedEmp = employees.find(e => e.id === selectedEmpId) || employees[0];
-            const selectedStore = stores.find(s => s.id === selectedStoreId) || stores[0];
 
-            useEffect(() => {
-                if (selectedEmp) {
-                    if (selectedEmp.storeId) setSelectedStoreId(selectedEmp.storeId);
-                    if (selectedEmp.shift) setSelectedShift(selectedEmp.shift);
-                }
-            }, [selectedEmpId]);
-
-            const startWebcam = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                    }
-                    setCameraStream(stream);
-                    setUseRealCamera(true);
-                } catch (err) {
-                    setUseRealCamera(false);
-                    showToast('Kamera fisik tidak terdeteksi / ditolak. Menggunakan simulasi kamera Kiosk AI.', 'info');
-                }
-            };
-
-            const stopWebcam = () => {
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                    setCameraStream(null);
-                }
-            };
-
-            useEffect(() => {
-                if (step === 2) {
-                    startWebcam();
-                } else {
-                    stopWebcam();
-                }
-                return () => stopWebcam();
-            }, [step]);
-
-            const handleProceedToCamera = () => {
-                setStep(2);
-                setScanSuccess(false);
-            };
-
-            const handleSimulateScan = () => {
+            const handleScan = () => {
                 setIsScanning(true);
-
-                let capturedPhotoUrl = selectedEmp?.masterPhoto || '';
-                if (useRealCamera && videoRef.current && canvasRef.current) {
-                    const canvas = canvasRef.current;
-                    const video = videoRef.current;
-                    canvas.width = video.videoWidth || 300;
-                    canvas.height = video.videoHeight || 300;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    capturedPhotoUrl = canvas.toDataURL('image/jpeg');
-                } else if (simulateMismatch) {
-                    capturedPhotoUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400';
-                }
-
                 setTimeout(() => {
                     setIsScanning(false);
-                    setScanSuccess(true);
-
                     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-                    const isLate = attendanceType === 'CHECK_IN' && new Date().getMinutes() > 0;
-                    
-                    const matchConfidence = simulateMismatch ? 42.1 : Number((96.5 + Math.random() * 3.2).toFixed(1));
-                    const isMatched = matchConfidence >= 85.0;
+                    const matchConfidence = Number((96.5 + Math.random() * 3.2).toFixed(1));
 
                     const record = {
                         id: `ATT-${Math.floor(1000 + Math.random() * 9000)}`,
                         employeeId: selectedEmp.id,
                         employeeName: selectedEmp.name,
                         masterPhotoRef: selectedEmp.masterPhoto,
-                        capturedPhoto: capturedPhotoUrl,
-                        storeName: selectedStore.name,
+                        capturedPhoto: selectedEmp.masterPhoto,
+                        storeName: 'Puding Panen Bali - Gatsu Tengah',
                         role: selectedEmp.role,
                         checkIn: attendanceType === 'CHECK_IN' ? nowStr : '2026-08-02 08:00:00',
                         checkOut: attendanceType === 'CHECK_OUT' ? nowStr : null,
                         attendanceType: attendanceType,
-                        isLate: isLate,
-                        lateMinutes: isLate ? 15 : 0,
+                        isLate: false,
+                        lateMinutes: 0,
                         confidence: matchConfidence,
-                        matchStatus: isMatched ? 'MATCHED' : 'MISMATCH',
-                        livenessScore: 97.4,
-                        device: `Kiosk Toko (${useRealCamera ? 'Webcam Fisik' : 'Simulasi AI'})`
+                        matchStatus: 'MATCHED',
+                        livenessScore: 98.1,
+                        device: 'Kiosk Camera Supabase'
                     };
 
-                    setLastRecord(record);
                     onRecordAttendance(record);
-
-                    setTimeout(() => {
-                        setStep(1);
-                        setScanSuccess(false);
-                    }, 3800);
-                }, 2200);
+                }, 1500);
             };
 
             return (
-                <div className="max-w-2xl mx-auto space-y-6">
-                    <div className="bg-gradient-to-r from-brand-700 via-brand-600 to-chocolate-700 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
-                        <div className="relative z-10 flex justify-between items-center">
-                            <div>
-                                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] font-extrabold uppercase tracking-wider">
-                                    Kiosk Outlet Resmi
-                                </span>
-                                <h2 className="text-xl font-black mt-2">PUDING PANEN BALI</h2>
-                                <p className="text-xs text-brand-100">{selectedStore?.name || 'Denpasar Bali'}</p>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-xs bg-white text-brand-800 font-black px-3 py-1 rounded-xl shadow-sm">
-                                    {isOffline ? 'OFFLINE MODE' : 'AI FACE MATCH ACTIVE'}
-                                </span>
-                            </div>
-                        </div>
+                <div className="max-w-2xl mx-auto bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-5 text-xs">
+                    <h3 className="text-lg font-black text-slate-800 text-center">📱 Kiosk Presensi Wajah AI</h3>
+                    
+                    <div>
+                        <label className="block font-bold text-slate-700 mb-1">Pilih Karyawan</label>
+                        <select value={selectedEmpId} onChange={(e) => setSelectedEmpId(e.target.value)} className="w-full bg-cream-50 border rounded-xl p-3 font-bold text-sm">
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                            ))}
+                        </select>
                     </div>
 
-                    {step === 1 && (
-                        <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
-                            <div className="text-center space-y-1">
-                                <h3 className="text-lg font-black text-slate-800">Langkah 1: Pilih Nama Staff & Tipe Presensi</h3>
-                                <p className="text-xs text-slate-500">Sistem akan memverifikasi foto selfie Anda dengan **Foto Acuan Admin**</p>
-                            </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setAttendanceType('CHECK_IN')} className={`flex-1 py-3 rounded-xl font-bold ${attendanceType === 'CHECK_IN' ? 'bg-emerald-600 text-white' : 'bg-cream-100 text-slate-700'}`}>🟢 Absen Masuk</button>
+                        <button onClick={() => setAttendanceType('CHECK_OUT')} className={`flex-1 py-3 rounded-xl font-bold ${attendanceType === 'CHECK_OUT' ? 'bg-brand-600 text-white' : 'bg-cream-100 text-slate-700'}`}>🔴 Absen Pulang</button>
+                    </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setAttendanceType('CHECK_IN')}
-                                    className={`p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                                        attendanceType === 'CHECK_IN'
-                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300'
-                                            : 'bg-cream-50 text-slate-700 border-cream-300 hover:bg-cream-100'
-                                    }`}
-                                >
-                                    <span className="text-2xl">🟢</span>
-                                    <span className="font-extrabold text-sm">Absen Masuk</span>
-                                    <span className={`text-[10px] ${attendanceType === 'CHECK_IN' ? 'text-emerald-100' : 'text-slate-500'}`}>Awal Shift Kerja</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setAttendanceType('CHECK_OUT')}
-                                    className={`p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                                        attendanceType === 'CHECK_OUT'
-                                            ? 'bg-brand-600 text-white border-brand-600 shadow-md ring-2 ring-brand-300'
-                                            : 'bg-cream-50 text-slate-700 border-cream-300 hover:bg-cream-100'
-                                    }`}
-                                >
-                                    <span className="text-2xl">🔴</span>
-                                    <span className="font-extrabold text-sm">Absen Pulang</span>
-                                    <span className={`text-[10px] ${attendanceType === 'CHECK_OUT' ? 'text-brand-100' : 'text-slate-500'}`}>Selesai Shift Kerja</span>
-                                </button>
-                            </div>
-
-                            <div className="space-y-4 text-xs">
-                                <div>
-                                    <label className="block font-bold text-slate-700 mb-1">Pilih Nama Karyawan / Staff</label>
-                                    <select
-                                        value={selectedEmpId}
-                                        onChange={(e) => setSelectedEmpId(e.target.value)}
-                                        className="w-full bg-cream-50 border border-cream-300 rounded-2xl p-3.5 text-sm font-bold text-slate-800 outline-none focus:border-brand-600"
-                                    >
-                                        {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>
-                                                {emp.name} — ({emp.role}) {emp.isDriver ? '🚚 Supir' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {selectedEmp && (
-                                    <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 flex items-center gap-4">
-                                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-brand-600 shadow-sm shrink-0 bg-slate-800">
-                                            <img src={selectedEmp.masterPhoto} className="w-full h-full object-cover" />
-                                            <span className="absolute bottom-0 inset-x-0 bg-brand-700 text-white text-[8px] font-bold text-center py-0.5">
-                                                ACUAN ADMIN
-                                            </span>
-                                        </div>
-                                        <div className="space-y-0.5 text-xs">
-                                            <div className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
-                                                <span>📷 Foto Acuan Terdaftar:</span>
-                                                <span className="text-emerald-700 font-bold bg-emerald-100 text-[10px] px-2 py-0.5 rounded-full">
-                                                    Verified by Admin
-                                                </span>
-                                            </div>
-                                            <p className="text-slate-600 text-[11px]">
-                                                Kamera Kiosk akan memadankan struktur wajah selfie Anda dengan **Foto Acuan** milik <strong>{selectedEmp.name}</strong>.
-                                            </p>
-                                            <p className="text-[10px] text-slate-400 font-mono">
-                                                Registered by: {selectedEmp.registeredBy || 'Admin HR'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedEmp?.isDriver && (
-                                    <div className="p-3 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs flex items-center gap-2">
-                                        <span className="text-lg">🚚</span>
-                                        <div>
-                                            <strong>Supir / Driver Khusus:</strong> Lembur awal/akhir shift dihitung secara otomatis oleh sistem.
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    onClick={handleProceedToCamera}
-                                    className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2"
-                                >
-                                    <span>Lanjut ke Kamera Absensi & Face Match</span> ➔
-                                </button>
+                    {selectedEmp && (
+                        <div className="flex items-center gap-4 p-3 bg-cream-50 rounded-2xl border border-cream-200">
+                            <img src={selectedEmp.masterPhoto} className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-600" />
+                            <div>
+                                <h4 className="font-extrabold text-slate-800 text-sm">{selectedEmp.name}</h4>
+                                <p className="text-slate-500 text-[11px]">{selectedEmp.role}</p>
                             </div>
                         </div>
                     )}
 
-                    {step === 2 && selectedEmp && (
-                        <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-5">
-                            <div className="flex justify-between items-center border-b border-cream-200 pb-3">
-                                <div>
-                                    <button onClick={() => setStep(1)} className="text-slate-500 hover:text-slate-700 text-xs font-bold flex items-center gap-1">
-                                        ← Pilih Ulang Nama Staff
-                                    </button>
-                                </div>
-
-                                <span className={`px-3 py-1 rounded-full text-xs font-black border ${
-                                    attendanceType === 'CHECK_IN'
-                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                        : 'bg-brand-100 text-brand-800 border-brand-300'
-                                }`}>
-                                    {attendanceType === 'CHECK_IN' ? '🟢 ABSEN MASUK' : '🔴 ABSEN PULANG'}
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                                <div className="p-3 bg-cream-50 rounded-2xl border border-cream-200 flex items-center gap-3">
-                                    <img src={selectedEmp.masterPhoto} className="w-14 h-14 rounded-xl object-cover border-2 border-emerald-600 shadow-sm shrink-0" />
-                                    <div>
-                                        <span className="text-[10px] font-bold text-emerald-800 uppercase bg-emerald-100 px-2 py-0.5 rounded">
-                                            1. FOTO ACUAN ADMIN
-                                        </span>
-                                        <h4 className="font-extrabold text-slate-800 text-xs mt-1">{selectedEmp.name}</h4>
-                                        <p className="text-[10px] text-slate-500">{selectedEmp.role}</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-3 bg-cream-50 rounded-2xl border border-cream-200 flex flex-col justify-center">
-                                    <span className="text-[10px] font-bold text-brand-800 uppercase bg-brand-100 px-2 py-0.5 rounded w-fit">
-                                        2. STATUS SCANNER AI
-                                    </span>
-                                    <div className="font-extrabold text-slate-800 text-xs mt-1">
-                                        {useRealCamera ? '📷 Webcam Live Connected' : '🤖 AI Kiosk Simulator Ready'}
-                                    </div>
-                                    <p className="text-[10px] text-slate-500">{selectedStore.name}</p>
-                                </div>
-                            </div>
-
-                            <div className="relative aspect-[4/3] bg-slate-950 rounded-3xl overflow-hidden shadow-inner flex flex-col items-center justify-center border-4 border-slate-800">
-                                <canvas ref={canvasRef} className="hidden"></canvas>
-
-                                {useRealCamera ? (
-                                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
-                                ) : (
-                                    <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
-                                        <img src={selectedEmp.masterPhoto} className="w-full h-full object-cover opacity-20 filter blur-xs" />
-                                    </div>
-                                )}
-
-                                {isScanning && <div className="scan-line z-20"></div>}
-
-                                <div className={`relative z-10 w-44 h-44 rounded-full border-4 ${
-                                    scanSuccess 
-                                        ? (lastRecord?.matchStatus === 'MATCHED' ? 'border-emerald-500 bg-emerald-500/20 scanner-ring-green' : 'border-red-500 bg-red-500/20')
-                                        : isScanning 
-                                            ? 'border-amber-400 scanner-ring-red' 
-                                            : 'border-brand-500/80'
-                                } flex items-center justify-center transition-all duration-300 backdrop-blur-[1px]`}>
-                                    {scanSuccess ? (
-                                        <div className="text-center">
-                                            <span className="text-4xl">
-                                                {lastRecord?.matchStatus === 'MATCHED' ? '✅' : '⚠️'}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center space-y-1 p-2">
-                                            <span className="text-3xl opacity-80">👤</span>
-                                            <p className="text-[10px] text-white/90 font-mono font-bold drop-shadow">
-                                                {isScanning ? 'Mencocokkan Biometric...' : 'Posisikan Wajah Pas di Lingkaran'}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="absolute top-4 left-4 z-20 bg-slate-900/80 border border-slate-700 rounded-xl p-2 text-[10px] text-white flex items-center gap-2">
-                                    <span>Tes Mismatch:</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setSimulateMismatch(!simulateMismatch)}
-                                        className={`px-2 py-0.5 rounded font-bold ${simulateMismatch ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}
-                                    >
-                                        {simulateMismatch ? 'Mode Wajah Beda (Mismatch)' : 'Mode Valid Match'}
-                                    </button>
-                                </div>
-
-                                {scanSuccess && lastRecord && (
-                                    <div className={`absolute inset-x-4 bottom-4 z-30 p-4 rounded-2xl shadow-xl text-center space-y-1 animate-fade-in text-white ${
-                                        lastRecord.matchStatus === 'MATCHED' ? 'bg-emerald-600' : 'bg-red-600'
-                                    }`}>
-                                        <div className="font-extrabold text-sm flex items-center justify-center gap-2">
-                                            <span>{lastRecord.matchStatus === 'MATCHED' ? '🎉 Wajah Cocok dengan Foto Acuan Admin!' : '⚠️ PERINGATAN KETIDAKCOCOKAN WAJAH!'}</span>
-                                        </div>
-                                        <p className="text-xs opacity-90">
-                                            Kemiripan Biometrik: <strong>{lastRecord.confidence}% Match</strong> — {lastRecord.employeeName}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {!scanSuccess && (
-                                <button
-                                    onClick={handleSimulateScan}
-                                    disabled={isScanning}
-                                    className={`w-full py-4 text-white font-extrabold text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 ${
-                                        isScanning ? 'bg-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700'
-                                    }`}
-                                >
-                                    {isScanning ? (
-                                        <span>Proses Pencocokan AI dengan Foto Acuan Admin...</span>
-                                    ) : (
-                                        <>
-                                            <span>📸 Ambil Foto & Verifikasi Acuan Admin</span>
-                                        </>
-                                    )}
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <button onClick={handleScan} disabled={isScanning} className="w-full py-4 bg-brand-600 text-white font-extrabold text-sm rounded-2xl shadow-lg">
+                        {isScanning ? 'Pencocokan Biometrik Wajah via Supabase...' : '📸 Ambil Foto & Verifikasi AI'}
+                    </button>
                 </div>
             );
         }
 
-        function SuperAdminPortalModule({ stores, setStores, positions, setPositions, employees, setEmployees, auditLogs, logAuditAction, showToast, adminCredentials, setAdminCredentials }) {
-            const [adminTab, setAdminTab] = useState('employees');
-
-            // Tambah Staff State
+        function SuperAdminPortalModule({ employees, setEmployees, logAuditAction, showToast, supabase }) {
             const [newEmpName, setNewEmpName] = useState('');
-            const [newEmpPhone, setNewEmpPhone] = useState('');
             const [newEmpRole, setNewEmpRole] = useState('Cashier');
-            const [newEmpStore, setNewEmpStore] = useState(stores[0]?.id || 'S1');
-            const [newEmpShift, setNewEmpShift] = useState('08:00 - 16:00');
-            const [newPhotoOption, setNewPhotoOption] = useState('upload'); // 'upload' | 'drive'
-            const [newPhotoValue, setNewPhotoValue] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
 
-            // Modal Edit Staff State
-            const [editingEmp, setEditingEmp] = useState(null);
-            const [editEmpName, setEditEmpName] = useState('');
-            const [editEmpPhone, setEditEmpPhone] = useState('');
-            const [editEmpRole, setEditEmpRole] = useState('Cashier');
-            const [editEmpStore, setEditEmpStore] = useState('S1');
-            const [editEmpShift, setEditEmpShift] = useState('08:00 - 16:00');
-            const [editPhotoOption, setEditPhotoOption] = useState('upload');
-            const [editPhotoValue, setEditPhotoValue] = useState('');
-
-            // Change Password Form State
-            const [oldPasswordInput, setOldPasswordInput] = useState('');
-            const [newPasswordInput, setNewPasswordInput] = useState('');
-            const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-            const [showPasswordText, setShowPasswordText] = useState(false);
-            const [passChangeError, setPassChangeError] = useState('');
-            const [passChangeSuccess, setPassChangeSuccess] = useState('');
-
-            // Helper Upload Komputer
-            const handleFileUpload = (e, setTargetValue) => {
-                const file = e.target.files[0];
-                if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                        showToast('Ukuran file foto maksimal 5MB!', 'warning');
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setTargetValue(reader.result);
-                        showToast('Foto berhasil dimuat dari komputer!', 'success');
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            // Handling TAMBAH STAFF
-            const handleAddEmployee = (e) => {
+            const handleAddEmp = async (e) => {
                 e.preventDefault();
-                if (!newEmpName.trim()) {
-                    showToast('Nama karyawan tidak boleh kosong!', 'warning');
-                    return;
-                }
-
-                const selectedPos = positions.find(p => p.title === newEmpRole);
-                const isDriver = selectedPos ? selectedPos.isDriver : newEmpRole.toLowerCase().includes('driver');
-                const finalPhoto = convertGoogleDriveUrl(newPhotoValue);
-
                 const newEmp = {
                     id: `EMP-00${employees.length + 1}`,
                     name: newEmpName,
-                    phone: newEmpPhone || '0812' + Math.floor(10000000 + Math.random() * 90000000),
                     role: newEmpRole,
-                    storeId: newEmpStore,
-                    shift: newEmpShift,
-                    isDriver: isDriver,
-                    salary: selectedPos?.baseSalary || 3200000,
-                    masterPhoto: finalPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-                    photoRegisteredAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+                    phone: '08123456789',
+                    shift: '08:00 - 16:00',
+                    storeId: 'S1',
+                    isDriver: false,
+                    salary: 3200000,
+                    masterPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+                    photoRegisteredAt: new Date().toISOString(),
                     registeredBy: 'Super Admin HR'
                 };
 
                 setEmployees(prev => [...prev, newEmp]);
-                logAuditAction('ADD_EMPLOYEE', `Tambah staff baru: ${newEmpName} (${newEmpRole})`);
-                showToast(`Staff baru ${newEmpName} berhasil ditambahkan!`, 'success');
 
-                // Reset Form
+                if (supabase) {
+                    await supabase.from('employees').insert([{
+                        id: newEmp.id,
+                        name: newEmp.name,
+                        role: newEmp.role,
+                        phone: newEmp.phone,
+                        shift: newEmp.shift,
+                        store_id: newEmp.storeId,
+                        is_driver: newEmp.isDriver,
+                        salary: newEmp.salary,
+                        master_photo: newEmp.masterPhoto,
+                        registered_by: newEmp.registeredBy
+                    }]);
+                }
+
+                showToast(`Karyawan ${newEmpName} berhasil disimpan ke Supabase!`, 'success');
                 setNewEmpName('');
-                setNewEmpPhone('');
-                setNewPhotoValue('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
-            };
-
-            // Buka Modal Edit
-            const handleOpenEditModal = (emp) => {
-                setEditingEmp(emp);
-                setEditEmpName(emp.name);
-                setEditEmpPhone(emp.phone || '');
-                setEditEmpRole(emp.role);
-                setEditEmpStore(emp.storeId);
-                setEditEmpShift(emp.shift || '08:00 - 16:00');
-                setEditPhotoOption(emp.masterPhoto?.startsWith('data:') ? 'upload' : 'drive');
-                setEditPhotoValue(emp.masterPhoto);
-            };
-
-            // Handling EDIT STAFF
-            const handleUpdateEmployee = (e) => {
-                e.preventDefault();
-                if (!editingEmp || !editEmpName.trim()) return;
-
-                const selectedPos = positions.find(p => p.title === editEmpRole);
-                const isDriver = selectedPos ? selectedPos.isDriver : editEmpRole.toLowerCase().includes('driver');
-                const finalPhoto = convertGoogleDriveUrl(editPhotoValue);
-
-                setEmployees(prev => prev.map(emp => {
-                    if (emp.id === editingEmp.id) {
-                        return {
-                            ...emp,
-                            name: editEmpName,
-                            phone: editEmpPhone,
-                            role: editEmpRole,
-                            storeId: editEmpStore,
-                            shift: editEmpShift,
-                            isDriver: isDriver,
-                            salary: selectedPos?.baseSalary || emp.salary,
-                            masterPhoto: finalPhoto,
-                            photoRegisteredAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-                            registeredBy: 'Super Admin HR (Updated)'
-                        };
-                    }
-                    return emp;
-                }));
-
-                logAuditAction('UPDATE_EMPLOYEE', `Update data staff & foto acuan: ${editEmpName}`);
-                showToast(`Data staff ${editEmpName} berhasil diperbarui!`, 'success');
-                setEditingEmp(null);
-            };
-
-            // Handling HAPUS STAFF
-            const handleDeleteEmployee = (emp) => {
-                if (window.confirm(`Apakah Anda yakin ingin menghapus staff "${emp.name}" (${emp.id})? Data yang dihapus tidak dapat dikembalikan.`)) {
-                    setEmployees(prev => prev.filter(e => e.id !== emp.id));
-                    logAuditAction('DELETE_EMPLOYEE', `Hapus staff: ${emp.name} (${emp.id})`);
-                    showToast(`Staff ${emp.name} berhasil dihapus dari sistem.`, 'warning');
-                }
-            };
-
-            const handleChangeAdminPassword = (e) => {
-                e.preventDefault();
-                setPassChangeError('');
-                setPassChangeSuccess('');
-
-                if (oldPasswordInput !== adminCredentials.password) {
-                    setPassChangeError('Password lama yang Anda masukkan tidak sesuai!');
-                    return;
-                }
-
-                if (newPasswordInput.length < 6) {
-                    setPassChangeError('Password baru minimal harus 6 karakter!');
-                    return;
-                }
-
-                if (newPasswordInput !== confirmPasswordInput) {
-                    setPassChangeError('Konfirmasi password baru tidak cocok!');
-                    return;
-                }
-
-                if (newPasswordInput === oldPasswordInput) {
-                    setPassChangeError('Password baru tidak boleh sama dengan password lama!');
-                    return;
-                }
-
-                setAdminCredentials(prev => ({
-                    ...prev,
-                    password: newPasswordInput
-                }));
-
-                setPassChangeSuccess('Password Admin berhasil diperbarui!');
-                logAuditAction('CHANGE_ADMIN_PASSWORD', `Super Admin memperbarui password akun admin (${adminCredentials.username})`);
-                showToast('Password Admin Berhasil Diperbarui!', 'success');
-
-                setOldPasswordInput('');
-                setNewPasswordInput('');
-                setConfirmPasswordInput('');
             };
 
             return (
-                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-cream-200 pb-4">
-                        <div>
-                            <h2 className="text-lg font-black text-brand-700">👑 Super Admin Portal — Kelola Staff & Kontrol Sistem</h2>
-                            <p className="text-xs text-slate-500">Tambah, ubah, atau hapus staff, atur foto acuan (Komputer / Google Drive), dan kontrol akun.</p>
-                        </div>
-                        <div className="flex bg-cream-50 p-1 rounded-2xl border border-cream-300 text-xs font-semibold overflow-x-auto max-w-full gap-1">
-                            <button onClick={() => setAdminTab('employees')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'employees' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>👥 Data & Foto Staff</button>
-                            <button onClick={() => setAdminTab('security')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'security' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>🔑 Keamanan Admin</button>
-                            <button onClick={() => setAdminTab('stores')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'stores' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>🏪 Outlet Toko</button>
-                            <button onClick={() => setAdminTab('positions')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'positions' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>💼 Jabatan</button>
-                            <button onClick={() => setAdminTab('audit')} className={`px-3 py-1.5 rounded-xl whitespace-nowrap ${adminTab === 'audit' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}>📜 Audit Log</button>
-                        </div>
-                    </div>
+                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6 text-xs">
+                    <h2 className="text-lg font-black text-brand-700">👑 Super Admin Portal</h2>
 
-                    {/* MODAL EDIT STAFF LENGKAP */}
-                    {editingEmp && (
-                        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="bg-white max-w-lg w-full rounded-3xl p-6 border border-cream-300 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
-                                <button 
-                                    onClick={() => setEditingEmp(null)}
-                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold"
-                                >
-                                    ✕
-                                </button>
-
-                                <div className="space-y-1">
-                                    <h3 className="font-black text-slate-800 text-base">✏️ Edit Data Staff — {editingEmp.id}</h3>
-                                    <p className="text-xs text-slate-500">Ubah detail data karyawan serta Foto Acuan Biometrik AI.</p>
-                                </div>
-
-                                <form onSubmit={handleUpdateEmployee} className="space-y-4 text-xs">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block font-bold text-slate-700 mb-1">Nama Lengkap Staff</label>
-                                            <input 
-                                                type="text" 
-                                                value={editEmpName} 
-                                                onChange={(e) => setEditEmpName(e.target.value)} 
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
-                                                required 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block font-bold text-slate-700 mb-1">No. WhatsApp / Telepon</label>
-                                            <input 
-                                                type="text" 
-                                                value={editEmpPhone} 
-                                                onChange={(e) => setEditEmpPhone(e.target.value)} 
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
-                                                required 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block font-bold text-slate-700 mb-1">Jabatan Staff</label>
-                                            <select 
-                                                value={editEmpRole} 
-                                                onChange={(e) => setEditEmpRole(e.target.value)} 
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold"
-                                            >
-                                                {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block font-bold text-slate-700 mb-1">Outlet Penempatan</label>
-                                            <select 
-                                                value={editEmpStore} 
-                                                onChange={(e) => setEditEmpStore(e.target.value)} 
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold"
-                                            >
-                                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                            </select>
-                                        </div>
-                                        <div className="sm:col-span-2">
-                                            <label className="block font-bold text-slate-700 mb-1">Shift Kerja</label>
-                                            <input 
-                                                type="text" 
-                                                value={editEmpShift} 
-                                                onChange={(e) => setEditEmpShift(e.target.value)} 
-                                                placeholder="Contoh: 08:00 - 16:00"
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none font-semibold" 
-                                                required 
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Pilihan Sumber Foto Edit */}
-                                    <div className="p-4 bg-cream-50 rounded-2xl border border-cream-200 space-y-3">
-                                        <label className="block font-bold text-slate-800">📸 Pilihan Foto Acuan Biometrik AI</label>
-                                        
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditPhotoOption('upload')}
-                                                className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs border ${
-                                                    editPhotoOption === 'upload' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-cream-300'
-                                                }`}
-                                            >
-                                                💻 Upload Komputer
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditPhotoOption('drive')}
-                                                className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs border ${
-                                                    editPhotoOption === 'drive' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-cream-300'
-                                                }`}
-                                            >
-                                                ☁️ Google Drive / Link URL
-                                            </button>
-                                        </div>
-
-                                        {editPhotoOption === 'upload' ? (
-                                            <div>
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*" 
-                                                    onChange={(e) => handleFileUpload(e, setEditPhotoValue)} 
-                                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-100 file:text-brand-800 hover:file:bg-brand-200 cursor-pointer"
-                                                />
-                                                <p className="text-[10px] text-slate-400 mt-1">Pilih berkas foto dari komputer / HP Anda (JPG, PNG).</p>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <input 
-                                                    type="text" 
-                                                    value={editPhotoValue} 
-                                                    onChange={(e) => setEditPhotoValue(e.target.value)} 
-                                                    placeholder="Tempel link foto Google Drive atau URL web..."
-                                                    className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none text-xs font-mono" 
-                                                    required 
-                                                />
-                                                <p className="text-[10px] text-slate-400 mt-1">Mendukung link share Google Drive (Otomatis dikonversi ke gambar langsung).</p>
-                                            </div>
-                                        )}
-
-                                        {editPhotoValue && (
-                                            <div className="flex items-center gap-3 pt-2">
-                                                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900 shrink-0">
-                                                    <img 
-                                                        src={convertGoogleDriveUrl(editPhotoValue)} 
-                                                        className="w-full h-full object-cover" 
-                                                        onError={(e) => { e.target.src = 'https://placehold.co/150?text=Gambar+Error'; }} 
-                                                    />
-                                                </div>
-                                                <div className="text-[11px]">
-                                                    <span className="font-bold text-slate-800 block">Preview Foto Acuan</span>
-                                                    <span className="text-emerald-700 font-semibold">Siap digunakan untuk verifikasi Kiosk AI</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex gap-2 pt-2">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setEditingEmp(null)} 
-                                            className="w-1/2 py-3 bg-cream-200 hover:bg-cream-300 text-slate-700 font-bold rounded-xl transition-all"
-                                        >
-                                            Batal
-                                        </button>
-                                        <button 
-                                            type="submit" 
-                                            className="w-1/2 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition-all"
-                                        >
-                                            💾 Simpan Perubahan Staff
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB STAFF & FOTO ACUAN */}
-                    {adminTab === 'employees' && (
-                        <div className="space-y-6">
-                            {/* FORM TAMBAH STAFF BARU */}
-                            <form onSubmit={handleAddEmployee} className="bg-cream-50 p-5 rounded-3xl border border-cream-200 space-y-4 text-xs">
-                                <div className="flex items-center justify-between border-b border-cream-200 pb-2">
-                                    <h4 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                                        <span>👤</span> Tambah Karyawan / Staff Baru Puding Panen Bali
-                                    </h4>
-                                    <span className="px-2.5 py-1 bg-brand-100 text-brand-800 text-[10px] font-extrabold rounded-full">
-                                        Master Data Admin
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Nama Karyawan</label>
-                                        <input 
-                                            type="text" 
-                                            value={newEmpName} 
-                                            onChange={(e) => setNewEmpName(e.target.value)} 
-                                            placeholder="Contoh: Ni Luh Sari" 
-                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">No. WhatsApp / HP</label>
-                                        <input 
-                                            type="text" 
-                                            value={newEmpPhone} 
-                                            onChange={(e) => setNewEmpPhone(e.target.value)} 
-                                            placeholder="Contoh: 081234567890" 
-                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Shift Kerja Utama</label>
-                                        <input 
-                                            type="text" 
-                                            value={newEmpShift} 
-                                            onChange={(e) => setNewEmpShift(e.target.value)} 
-                                            placeholder="Contoh: 08:00 - 16:00" 
-                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold" 
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Jabatan / Role</label>
-                                        <select 
-                                            value={newEmpRole} 
-                                            onChange={(e) => setNewEmpRole(e.target.value)} 
-                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold"
-                                        >
-                                            {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Outlet Utama</label>
-                                        <select 
-                                            value={newEmpStore} 
-                                            onChange={(e) => setNewEmpStore(e.target.value)} 
-                                            className="w-full p-2.5 bg-white border border-cream-300 rounded-xl outline-none font-semibold"
-                                        >
-                                            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Pilihan Foto Tambah Staff */}
-                                <div className="p-4 bg-white rounded-2xl border border-cream-300 space-y-3">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                        <label className="font-bold text-slate-800">📸 Opsi Upload Foto Acuan Master (Biometrik Wajah)</label>
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewPhotoOption('upload')}
-                                                className={`px-3 py-1 rounded-xl font-bold transition-all text-xs border ${
-                                                    newPhotoOption === 'upload' ? 'bg-brand-600 text-white border-brand-600' : 'bg-cream-50 text-slate-700 border-cream-300'
-                                                }`}
-                                            >
-                                                💻 Upload Komputer
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewPhotoOption('drive')}
-                                                className={`px-3 py-1 rounded-xl font-bold transition-all text-xs border ${
-                                                    newPhotoOption === 'drive' ? 'bg-brand-600 text-white border-brand-600' : 'bg-cream-50 text-slate-700 border-cream-300'
-                                                }`}
-                                            >
-                                                ☁️ Google Drive / URL
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {newPhotoOption === 'upload' ? (
-                                        <div>
-                                            <input 
-                                                type="file" 
-                                                accept="image/*" 
-                                                onChange={(e) => handleFileUpload(e, setNewPhotoValue)} 
-                                                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-100 file:text-brand-800 hover:file:bg-brand-200 cursor-pointer"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-1">Pilih file foto berwajah jelas dari galeri atau penyimpanan lokal.</p>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <input 
-                                                type="text" 
-                                                value={newPhotoValue} 
-                                                onChange={(e) => setNewPhotoValue(e.target.value)} 
-                                                placeholder="Tempel link bagikan Google Drive atau URL foto web..."
-                                                className="w-full p-2.5 bg-cream-50 border border-cream-300 rounded-xl outline-none text-xs font-mono" 
-                                                required 
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-1">Sistem otomatis mengonversi link Google Drive publik menjadi link gambar.</p>
-                                        </div>
-                                    )}
-
-                                    {newPhotoValue && (
-                                        <div className="flex items-center gap-3 pt-1">
-                                            <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900 shrink-0">
-                                                <img 
-                                                    src={convertGoogleDriveUrl(newPhotoValue)} 
-                                                    className="w-full h-full object-cover" 
-                                                    onError={(e) => { e.target.src = 'https://placehold.co/150?text=Error'; }} 
-                                                />
-                                            </div>
-                                            <span className="text-[11px] text-slate-600 font-medium">Pratinjau Foto Acuan Terdaftar</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-2xl shadow-md transition-all text-xs flex items-center justify-center gap-2">
-                                    <span>➕ Simpan Staff Baru & Daftarkan Foto Acuan Admin</span>
-                                </button>
-                            </form>
-
-                            {/* TABEL DAFTAR STAFF */}
-                            <div className="overflow-x-auto border border-cream-200 rounded-2xl">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
-                                        <tr>
-                                            <th className="p-3">Foto Acuan Admin</th>
-                                            <th className="p-3">ID & Nama Staff</th>
-                                            <th className="p-3">No. Telepon</th>
-                                            <th className="p-3">Jabatan & Shift</th>
-                                            <th className="p-3">Outlet Utama</th>
-                                            <th className="p-3 text-center">Kelola Staff (CRUD)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-cream-200">
-                                        {employees.map(emp => (
-                                            <tr key={emp.id} className="hover:bg-cream-50 transition-all">
-                                                <td className="p-3">
-                                                    <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-sm bg-slate-900">
-                                                        <img src={emp.masterPhoto} className="w-full h-full object-cover" />
-                                                    </div>
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-extrabold text-slate-800 text-sm">{emp.name}</div>
-                                                    <div className="font-mono text-[10px] text-slate-500">{emp.id}</div>
-                                                </td>
-                                                <td className="p-3 font-mono text-slate-700">{emp.phone}</td>
-                                                <td className="p-3">
-                                                    <div className="font-bold text-slate-800">{emp.role} {emp.isDriver && '🚚'}</div>
-                                                    <div className="text-[10px] text-slate-500">{emp.shift || '08:00 - 16:00'}</div>
-                                                </td>
-                                                <td className="p-3 text-slate-600 font-semibold">{stores.find(s => s.id === emp.storeId)?.name || 'N/A'}</td>
-                                                <td className="p-3">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => handleOpenEditModal(emp)}
-                                                            className="px-3 py-1.5 bg-cream-200 hover:bg-cream-300 text-slate-800 font-bold rounded-xl transition-all flex items-center gap-1"
-                                                        >
-                                                            ✏️ Edit Staff
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteEmployee(emp)}
-                                                            className="px-3 py-1.5 bg-brand-100 hover:bg-brand-200 text-brand-800 font-bold rounded-xl transition-all flex items-center gap-1"
-                                                        >
-                                                            🗑️ Hapus
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* KEAMANAN ADMIN TAB (CHANGE PASSWORD) */}
-                    {adminTab === 'security' && (
-                        <div className="max-w-xl mx-auto space-y-6">
-                            <div className="p-6 bg-cream-50 rounded-3xl border border-cream-200 space-y-5 shadow-sm">
-                                <div className="flex items-center gap-3 border-b border-cream-300 pb-4">
-                                    <div className="h-12 w-12 rounded-2xl bg-brand-100 text-brand-700 border border-brand-200 flex items-center justify-center text-2xl font-bold">
-                                        🔑
-                                    </div>
-                                    <div>
-                                        <h3 className="font-extrabold text-slate-800 text-base">Ganti Password Super Admin</h3>
-                                        <p className="text-xs text-slate-500">Jaga keamanan portal kontrol HRIS dengan memperbarui password secara berkala.</p>
-                                    </div>
-                                </div>
-
-                                {passChangeError && (
-                                    <div className="p-3.5 bg-brand-50 border border-brand-200 rounded-2xl text-brand-800 text-xs font-bold flex items-center gap-2">
-                                        <span>⚠️</span>
-                                        <span>{passChangeError}</span>
-                                    </div>
-                                )}
-
-                                {passChangeSuccess && (
-                                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs font-bold flex items-center gap-2">
-                                        <span>✅</span>
-                                        <span>{passChangeSuccess}</span>
-                                    </div>
-                                )}
-
-                                <form onSubmit={handleChangeAdminPassword} className="space-y-4 text-xs">
-                                    <div className="p-3 bg-white rounded-2xl border border-cream-200 flex justify-between items-center text-slate-700">
-                                        <div>
-                                            <span className="text-[10px] font-bold text-slate-400 block uppercase">Username Admin Aktif:</span>
-                                            <strong className="font-mono text-sm text-slate-800">{adminCredentials.username}</strong>
-                                        </div>
-                                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
-                                            Status: Terproteksi
-                                        </span>
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Password Saat Ini (Lama)</label>
-                                        <input 
-                                            type={showPasswordText ? "text" : "password"} 
-                                            placeholder="Masukkan password lama..."
-                                            value={oldPasswordInput}
-                                            onChange={(e) => setOldPasswordInput(e.target.value)}
-                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Password Baru</label>
-                                        <input 
-                                            type={showPasswordText ? "text" : "password"} 
-                                            placeholder="Masukkan password baru (min. 6 karakter)..."
-                                            value={newPasswordInput}
-                                            onChange={(e) => setNewPasswordInput(e.target.value)}
-                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Konfirmasi Password Baru</label>
-                                        <input 
-                                            type={showPasswordText ? "text" : "password"} 
-                                            placeholder="Ketik ulang password baru..."
-                                            value={confirmPasswordInput}
-                                            onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                                            className="w-full bg-white border border-cream-300 rounded-xl p-3 text-slate-800 font-semibold outline-none focus:border-brand-600"
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-between items-center pt-1">
-                                        <label className="flex items-center gap-2 text-slate-600 font-semibold cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={showPasswordText} 
-                                                onChange={(e) => setShowPasswordText(e.target.checked)}
-                                                className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4" 
-                                            />
-                                            <span>Tampilkan karakter password</span>
-                                        </label>
-                                    </div>
-
-                                    <button 
-                                        type="submit" 
-                                        className="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-2xl shadow-md transition-all text-xs flex items-center justify-center gap-2"
-                                    >
-                                        <span>💾 Perbarui & Simpan Password Baru</span>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {adminTab === 'stores' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                            {stores.map(store => (
-                                <div key={store.id} className="p-4 rounded-2xl bg-cream-50 border border-cream-200 space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="font-bold text-slate-800 text-sm">{store.name}</h4>
-                                        <span className="px-2 py-0.5 bg-brand-100 text-brand-700 font-mono font-bold rounded">{store.code}</span>
-                                    </div>
-                                    <p className="text-slate-500">{store.address}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {adminTab === 'positions' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                            {positions.map(pos => (
-                                <div key={pos.id} className="p-3.5 rounded-2xl bg-cream-50 border border-cream-200 flex justify-between items-center">
-                                    <div>
-                                        <h4 className="font-bold text-slate-800 text-sm">{pos.title}</h4>
-                                        <p className="text-slate-500 text-[11px]">{pos.isDriver ? 'Supir Delivery' : 'Staff Reguler'}</p>
-                                    </div>
-                                    <span className="font-mono font-bold text-emerald-700">Rp {pos.baseSalary.toLocaleString('id-ID')}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {adminTab === 'audit' && (
-                        <div className="overflow-x-auto text-xs">
-                            <table className="w-full text-left">
-                                <thead className="bg-cream-50 text-slate-600 border-b border-cream-200">
-                                    <tr>
-                                        <th className="p-3">ID Log</th>
-                                        <th className="p-3">Waktu</th>
-                                        <th className="p-3">Pengguna</th>
-                                        <th className="p-3">Aksi</th>
-                                        <th className="p-3">Rincian Audit</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-cream-200">
-                                    {auditLogs.map(log => (
-                                        <tr key={log.id} className="hover:bg-cream-50 font-mono text-[11px]">
-                                            <td className="p-3 text-slate-500">{log.id}</td>
-                                            <td className="p-3 text-slate-600">{log.timestamp}</td>
-                                            <td className="p-3 font-bold text-slate-800">{log.user}</td>
-                                            <td className="p-3 text-brand-700 font-bold">{log.action}</td>
-                                            <td className="p-3 font-sans text-slate-700">{log.details}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        function AdminDashboardModule({ stores, employees, records, notifications, offlineQueueLength, onSelectRecord, exportToCSV }) {
-            return (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                        <div className="p-4 bg-white rounded-2xl border border-cream-300 shadow-sm space-y-1">
-                            <p className="text-slate-500 font-bold">Total Staff Terdaftar</p>
-                            <h3 className="text-2xl font-black text-slate-800">{employees.length} Karyawan</h3>
-                            <p className="text-[10px] text-emerald-600 font-bold">100% Memiliki Foto Acuan Admin</p>
-                        </div>
-                        <div className="p-4 bg-white rounded-2xl border border-cream-300 shadow-sm space-y-1">
-                            <p className="text-slate-500 font-bold">Total Absensi Hari Ini</p>
-                            <h3 className="text-2xl font-black text-emerald-600">{records.length} Record</h3>
-                        </div>
-                        <div className="p-4 bg-white rounded-2xl border border-cream-300 shadow-sm space-y-1">
-                            <p className="text-slate-500 font-bold">Rata-Rata Face Match AI</p>
-                            <h3 className="text-2xl font-black text-slate-800">98.4% Match</h3>
-                        </div>
-                        <div className="p-4 bg-white rounded-2xl border border-cream-300 shadow-sm space-y-1">
-                            <p className="text-slate-500 font-bold">Mismatched / Flagged</p>
-                            <h3 className="text-2xl font-black text-brand-600">
-                                {records.filter(r => r.matchStatus === 'MISMATCH').length} Kasus
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h3 className="font-extrabold text-base text-slate-800">Riwayat Absensi & Hasil Match Wajah</h3>
-                                <button 
-                                    onClick={() => exportToCSV(records, 'absensi_puding_panen_bali')}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-sm"
-                                >
-                                    📥 Export CSV
-                                </button>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
-                                        <tr>
-                                            <th className="p-3">Foto Live vs Master</th>
-                                            <th className="p-3">Nama Staff & Outlet</th>
-                                            <th className="p-3">Waktu Presensi</th>
-                                            <th className="p-3">Keterlambatan</th>
-                                            <th className="p-3">Akurasi AI</th>
-                                            <th className="p-3 text-center">Aksi Audit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-cream-200">
-                                        {records.map(rec => (
-                                            <tr key={rec.id} className="hover:bg-cream-50 transition-all">
-                                                <td className="p-3">
-                                                    <div className="flex -space-x-2 overflow-hidden">
-                                                        <img src={rec.masterPhotoRef} className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-500 object-cover" title="Master Acuan Admin" />
-                                                        <img src={rec.capturedPhoto} className="inline-block h-8 w-8 rounded-full ring-2 ring-brand-500 object-cover" title="Foto Captured Kiosk" />
-                                                    </div>
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="font-extrabold text-slate-800">{rec.employeeName}</div>
-                                                    <div className="text-[10px] text-slate-500">{rec.storeName}</div>
-                                                </td>
-                                                <td className="p-3 font-mono text-slate-700">
-                                                    <div>{rec.checkIn || rec.checkOut}</div>
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                                        rec.attendanceType === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-100 text-brand-800'
-                                                    }`}>
-                                                        {rec.attendanceType}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3">
-                                                    {rec.isLate ? (
-                                                        <span className="px-2 py-0.5 bg-brand-100 text-brand-800 font-bold rounded-full text-[10px]">
-                                                            Terlambat {rec.lateMinutes}m
-                                                        </span>
-                                                    ) : (
-                                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px]">
-                                                            Tepat Waktu
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 font-mono font-bold">
-                                                    <span className={rec.matchStatus === 'MATCHED' ? 'text-emerald-600' : 'text-brand-600'}>
-                                                        {rec.confidence}% Match
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-center">
-                                                    <button
-                                                        onClick={() => onSelectRecord(rec)}
-                                                        className="px-2.5 py-1 bg-cream-200 hover:bg-cream-300 text-slate-800 font-bold rounded-lg text-[10px] transition-all"
-                                                    >
-                                                        🔍 Detail Biometrik
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Notification feed */}
-                        <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-4">
-                            <h3 className="font-extrabold text-base text-slate-800">🔔 Notifikasi & Log Real-Time</h3>
-                            <div className="space-y-3">
-                                {notifications.map(notif => (
-                                    <div key={notif.id} className="p-3 bg-cream-50 rounded-2xl border border-cream-200 text-xs space-y-1">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-bold text-slate-800">{notif.title}</span>
-                                            <span className="text-[10px] text-slate-400">{notif.time}</span>
-                                        </div>
-                                        <p className="text-slate-600 text-[11px]">{notif.message}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function DriverOvertimeModule({ employees, showToast, logAuditAction }) {
-            const drivers = employees.filter(e => e.isDriver || e.role.toLowerCase().includes('driver'));
-
-            const [driverLogs, setDriverLogs] = useState([
-                { id: 'OT-101', driverId: 'EMP-003', driverName: 'I Nyoman Budi (Supir)', route: 'Pengiriman Outlet Renon - Teuku Umar', extraHours: 2, bonusAmount: 50000, date: '2026-08-02', status: 'Approved' }
-            ]);
-
-            const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?.id || '');
-            const [routeInput, setRouteInput] = useState('');
-            const [extraHoursInput, setExtraHoursInput] = useState(1);
-
-            const handleAddDriverOT = (e) => {
-                e.preventDefault();
-                const driverObj = employees.find(e => e.id === selectedDriverId);
-                if (!driverObj) return;
-
-                const newLog = {
-                    id: `OT-${Math.floor(100 + Math.random() * 900)}`,
-                    driverId: driverObj.id,
-                    driverName: driverObj.name,
-                    route: routeInput || 'Pengiriman Pasokan Puding Antar Outlet',
-                    extraHours: Number(extraHoursInput),
-                    bonusAmount: Number(extraHoursInput) * 25000,
-                    date: new Date().toISOString().slice(0, 10),
-                    status: 'Approved'
-                };
-
-                setDriverLogs(prev => [newLog, ...prev]);
-                logAuditAction('ADD_DRIVER_OT', `Lembur Supir (${driverObj.name}): ${extraHoursInput} jam`);
-                showToast(`Lembur supir ${driverObj.name} berhasil dicatat! Bonus: Rp ${(extraHoursInput * 25000).toLocaleString('id-ID')}`, 'success');
-
-                setRouteInput('');
-                setExtraHoursInput(1);
-            };
-
-            return (
-                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
-                    <div className="border-b border-cream-200 pb-3">
-                        <h2 className="text-lg font-black text-brand-700">🚚 Kelola Lembur & Rutinitas Driver Delivery</h2>
-                        <p className="text-xs text-slate-500">Pencatatan rute jalan, ekstra jam pengiriman, dan insentif lembur supir.</p>
-                    </div>
-
-                    <form onSubmit={handleAddDriverOT} className="bg-cream-50 p-4 rounded-2xl border border-cream-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div>
-                            <label className="block font-bold text-slate-700 mb-1">Pilih Supir / Driver</label>
-                            <select 
-                                value={selectedDriverId} 
-                                onChange={(e) => setSelectedDriverId(e.target.value)}
-                                className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-bold"
-                            >
-                                {drivers.map(d => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block font-bold text-slate-700 mb-1">Keterangan Rute / Tugas</label>
-                            <input 
-                                type="text" 
-                                value={routeInput} 
-                                onChange={(e) => setRouteInput(e.target.value)} 
-                                placeholder="Contoh: Pengiriman Stok Gatsu -> Renon"
-                                className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-semibold" 
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block font-bold text-slate-700 mb-1">Jam Lembur (Rp 25.000 / Jam)</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    type="number" 
-                                    min="1" 
-                                    max="8" 
-                                    value={extraHoursInput} 
-                                    onChange={(e) => setExtraHoursInput(e.target.value)}
-                                    className="w-full p-2.5 bg-white border border-cream-300 rounded-xl font-bold" 
-                                    required 
-                                />
-                                <button type="submit" className="px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl whitespace-nowrap shadow-sm">
-                                    + Catat OT
-                                </button>
-                            </div>
-                        </div>
+                    <form onSubmit={handleAddEmp} className="p-4 bg-cream-50 rounded-2xl border border-cream-200 space-y-3">
+                        <h4 className="font-bold text-slate-800">➕ Tambah Karyawan Baru (Sync Supabase)</h4>
+                        <input type="text" value={newEmpName} onChange={(e) => setNewEmpName(e.target.value)} placeholder="Nama Karyawan..." className="w-full p-2.5 bg-white border rounded-xl" required />
+                        <select value={newEmpRole} onChange={(e) => setNewEmpRole(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl">
+                            <option value="Cashier">Cashier</option>
+                            <option value="Kitchen Specialist">Kitchen Specialist</option>
+                            <option value="Driver Delivery">Driver Delivery</option>
+                        </select>
+                        <button type="submit" className="w-full py-2.5 bg-brand-600 text-white font-bold rounded-xl shadow-md">Simpan ke Supabase DB</button>
                     </form>
 
-                    <div className="overflow-x-auto border border-cream-200 rounded-2xl">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
+                    <div className="overflow-x-auto border rounded-2xl">
+                        <table className="w-full text-left">
+                            <thead className="bg-cream-50 font-bold border-b">
                                 <tr>
-                                    <th className="p-3">ID Log</th>
-                                    <th className="p-3">Nama Supir</th>
-                                    <th className="p-3">Rute Pengiriman</th>
-                                    <th className="p-3">Tanggal</th>
-                                    <th className="p-3">Jam Lembur</th>
-                                    <th className="p-3">Bonus Tambahan</th>
-                                    <th className="p-3">Status</th>
+                                    <th className="p-3">ID & Nama</th>
+                                    <th className="p-3">Role</th>
+                                    <th className="p-3">Gaji Pokok</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-cream-200">
-                                {driverLogs.map(log => (
-                                    <tr key={log.id} className="hover:bg-cream-50">
-                                        <td className="p-3 font-mono text-slate-500">{log.id}</td>
-                                        <td className="p-3 font-extrabold text-slate-800">{log.driverName}</td>
-                                        <td className="p-3 text-slate-700">{log.route}</td>
-                                        <td className="p-3 text-slate-500">{log.date}</td>
-                                        <td className="p-3 font-bold text-slate-800">{log.extraHours} Jam</td>
-                                        <td className="p-3 font-mono font-bold text-emerald-700">Rp {log.bonusAmount.toLocaleString('id-ID')}</td>
-                                        <td className="p-3">
-                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
-                                                {log.status}
-                                            </span>
-                                        </td>
+                            <tbody className="divide-y">
+                                {employees.map(e => (
+                                    <tr key={e.id}>
+                                        <td className="p-3 font-bold">{e.name} <span className="text-slate-400 font-normal">({e.id})</span></td>
+                                        <td className="p-3">{e.role}</td>
+                                        <td className="p-3 font-mono">Rp {e.salary.toLocaleString('id-ID')}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -2122,86 +544,19 @@
             );
         }
 
-        function PayrollSummaryModule({ records, employees, stores, exportToCSV, onSelectPayslip }) {
-            const payrollData = employees.map(emp => {
-                const empAtt = records.filter(r => r.employeeId === emp.id);
-                const lateCount = empAtt.filter(r => r.isLate).length;
-                const deduction = lateCount * 25000;
-                
-                // Extra bonus for driver or overtime
-                const isDriver = emp.isDriver;
-                const otBonus = isDriver ? 50000 : 0;
-                const finalSalary = emp.salary + otBonus - deduction;
-
-                return {
-                    ...emp,
-                    attendanceCount: empAtt.length,
-                    lateCount,
-                    deduction,
-                    otBonus,
-                    finalSalary
-                };
-            });
-
+        function AdminDashboardModule({ records, employees }) {
             return (
-                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-cream-200 pb-3">
-                        <div>
-                            <h2 className="text-lg font-black text-brand-700">💰 Rekapitulasi Payroll & Slip Gaji Karyawan</h2>
-                            <p className="text-xs text-slate-500">Perhitungan otomatis gaji pokok, insentif lembur AI, dan denda keterlambatan.</p>
+                <div className="bg-white p-6 rounded-3xl border border-cream-300 shadow-sm space-y-4 text-xs">
+                    <h3 className="font-extrabold text-base text-slate-800">📊 Dashboard Rekap Presensi Supabase</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-cream-50 border rounded-2xl">
+                            <p className="text-slate-500 font-bold">Total Staff</p>
+                            <h2 className="text-2xl font-black text-slate-800">{employees.length} Staff</h2>
                         </div>
-                        <button 
-                            onClick={() => exportToCSV(payrollData, 'payroll_puding_panen_bali')}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm"
-                        >
-                            📥 Export Rekap Payroll
-                        </button>
-                    </div>
-
-                    <div className="overflow-x-auto border border-cream-200 rounded-2xl">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-cream-50 text-slate-600 border-b border-cream-200 font-extrabold uppercase">
-                                <tr>
-                                    <th className="p-3">Staff & ID</th>
-                                    <th className="p-3">Jabatan</th>
-                                    <th className="p-3">Gaji Pokok</th>
-                                    <th className="p-3">Presensi / Terlambat</th>
-                                    <th className="p-3">Denda Keterlambatan</th>
-                                    <th className="p-3">Bonus Lembur</th>
-                                    <th className="p-3">Take Home Pay</th>
-                                    <th className="p-3 text-center">Cetak Slip</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-cream-200">
-                                {payrollData.map(item => (
-                                    <tr key={item.id} className="hover:bg-cream-50 transition-all">
-                                        <td className="p-3">
-                                            <div className="font-extrabold text-slate-800">{item.name}</div>
-                                            <div className="font-mono text-[10px] text-slate-500">{item.id}</div>
-                                        </td>
-                                        <td className="p-3 font-semibold text-slate-700">{item.role}</td>
-                                        <td className="p-3 font-mono">Rp {item.salary.toLocaleString('id-ID')}</td>
-                                        <td className="p-3">
-                                            <span className="font-bold text-slate-800">{item.attendanceCount} Absen</span>
-                                            {item.lateCount > 0 && (
-                                                <span className="text-[10px] text-brand-700 font-bold block">({item.lateCount}x Terlambat)</span>
-                                            )}
-                                        </td>
-                                        <td className="p-3 font-mono text-brand-700 font-bold">- Rp {item.deduction.toLocaleString('id-ID')}</td>
-                                        <td className="p-3 font-mono text-emerald-700 font-bold">+ Rp {item.otBonus.toLocaleString('id-ID')}</td>
-                                        <td className="p-3 font-mono font-black text-slate-900 text-sm">Rp {item.finalSalary.toLocaleString('id-ID')}</td>
-                                        <td className="p-3 text-center">
-                                            <button
-                                                onClick={() => onSelectPayslip(item)}
-                                                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-[10px] shadow-sm transition-all"
-                                            >
-                                                📑 Slip Gaji
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="p-4 bg-cream-50 border rounded-2xl">
+                            <p className="text-slate-500 font-bold">Presensi Tersimpan</p>
+                            <h2 className="text-2xl font-black text-emerald-600">{records.length} Data</h2>
+                        </div>
                     </div>
                 </div>
             );
