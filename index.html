@@ -73,6 +73,23 @@
             return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
         };
 
+        // Converts a captured canvas dataURL into a Blob so it can be uploaded to Supabase Storage
+        const dataUrlToBlob = (dataUrl) => {
+            const [meta, base64] = dataUrl.split(',');
+            const mimeMatch = meta.match(/:(.*?);/);
+            const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+            const binary = atob(base64);
+            const array = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+            return new Blob([array], { type: mime });
+        };
+
+        // Maps a Supabase `employees` row (snake_case) to the app's employee shape (camelCase)
+        const mapEmployeeRow = (e) => ({
+            id: e.id, name: e.name, phone: e.phone, role: e.role,
+            storeId: e.store_id, shift: e.shift, isDriver: e.is_driver, masterPhoto: e.master_photo
+        });
+
         const INITIAL_STORES = [
             { id: 'S1', code: 'OUT-01', name: 'Outlet Seminyak', address: 'Jl. Kayu Aya No. 12, Seminyak' },
             { id: 'S2', code: 'OUT-02', name: 'Outlet Ubud', address: 'Jl. Raya Ubud No. 45, Ubud' },
@@ -113,6 +130,7 @@
             const [supabaseKey, setSupabaseKey] = useState(localStorage.getItem('SUPABASE_KEY') || DEFAULT_SUPABASE_KEY);
             const [supabaseClient, setSupabaseClient] = useState(null);
             const [isConnected, setIsConnected] = useState(false);
+            const [isLoadingData, setIsLoadingData] = useState(true);
 
             // Application Data States
             const [stores, setStores] = useState(INITIAL_STORES);
@@ -176,8 +194,47 @@
                         console.error('Supabase Connection Error:', err);
                         setIsConnected(false);
                     }
+                } else {
+                    setIsLoadingData(false);
                 }
             }, [supabaseUrl, supabaseKey]);
+
+            // Pulls stores/roles/employees/attendance from Supabase whenever the client is (re)connected,
+            // so every device reads the same shared data instead of each device's own local state.
+            useEffect(() => {
+                if (!supabaseClient) return;
+                let cancelled = false;
+
+                (async () => {
+                    setIsLoadingData(true);
+                    try {
+                        const [storesRes, rolesRes, employeesRes, attendanceRes] = await Promise.all([
+                            supabaseClient.from('stores').select('*').order('created_at', { ascending: true }),
+                            supabaseClient.from('roles').select('*').order('created_at', { ascending: true }),
+                            supabaseClient.from('employees').select('*').order('created_at', { ascending: true }),
+                            supabaseClient.from('attendance_records').select('*').order('created_at', { ascending: false }).limit(500)
+                        ]);
+                        if (cancelled) return;
+
+                        if (storesRes.error) throw storesRes.error;
+                        if (rolesRes.error) throw rolesRes.error;
+                        if (employeesRes.error) throw employeesRes.error;
+                        if (attendanceRes.error) throw attendanceRes.error;
+
+                        if (storesRes.data) setStores(storesRes.data.map(s => ({ id: s.id, code: s.code, name: s.name, address: s.address })));
+                        if (rolesRes.data) setRoles(rolesRes.data.map(r => r.name));
+                        if (employeesRes.data) setEmployees(employeesRes.data.map(mapEmployeeRow));
+                        if (attendanceRes.data) setAttendanceRecords(attendanceRes.data);
+                    } catch (err) {
+                        console.error('Gagal memuat data dari Supabase:', err);
+                        alert('Gagal memuat data dari database Supabase. Data yang tampil mungkin tidak terbaru. Periksa URL/Key dan koneksi internet.');
+                    } finally {
+                        if (!cancelled) setIsLoadingData(false);
+                    }
+                })();
+
+                return () => { cancelled = true; };
+            }, [supabaseClient]);
 
             const calculateLateMinutes = (shiftString) => {
                 const now = new Date();
@@ -269,24 +326,42 @@
                 setIsCameraActive(false);
 
                 setIsVerifying(true);
-                setTimeout(() => {
-                    setIsVerifying(false);
+                setTimeout(async () => {
                     const selectedEmp = employees.find(e => e.id === selectedEmpId);
                     const selectedStore = stores.find(s => s.id === selectedStoreId);
                     const lateMins = calculateLateMinutes(selectedShift);
                     const isLate = attendanceType === 'CHECK_IN' && lateMins > 0;
+                    const nowIso = new Date().toISOString();
+
+                    // Upload the captured photo to Supabase Storage so all devices can see it
+                    // (storing raw base64 in the DB row would bloat the table fast).
+                    let photoUrl = photoData;
+                    if (supabaseClient) {
+                        try {
+                            const blob = dataUrlToBlob(photoData);
+                            const path = `${selectedEmp?.id || 'unknown'}/${Date.now()}.jpg`;
+                            const { error: uploadError } = await supabaseClient.storage
+                                .from('attendance-photos')
+                                .upload(path, blob, { contentType: 'image/jpeg' });
+                            if (uploadError) throw uploadError;
+                            const { data: publicUrlData } = supabaseClient.storage.from('attendance-photos').getPublicUrl(path);
+                            if (publicUrlData?.publicUrl) photoUrl = publicUrlData.publicUrl;
+                        } catch (err) {
+                            console.error('Gagal upload foto absensi ke Supabase Storage:', err);
+                        }
+                    }
 
                     const record = {
                         id: 'ATT-' + Date.now(),
                         employee_id: selectedEmp?.id || 'EMP-UNKNOWN',
                         employee_name: selectedEmp?.name || 'Staff',
                         master_photo_ref: selectedEmp?.masterPhoto || '',
-                        captured_photo: photoData,
+                        captured_photo: photoUrl,
                         store_name: selectedStore?.name || 'Outlet Seminyak',
                         shift: selectedShift,
                         role: selectedEmp?.role || 'Staff',
-                        check_in: attendanceType === 'CHECK_IN' ? new Date().toISOString() : null,
-                        check_out: attendanceType === 'CHECK_OUT' ? new Date().toISOString() : null,
+                        check_in: attendanceType === 'CHECK_IN' ? nowIso : null,
+                        check_out: attendanceType === 'CHECK_OUT' ? nowIso : null,
                         attendance_type: attendanceType,
                         is_late: isLate,
                         late_minutes: lateMins,
@@ -294,9 +369,20 @@
                         match_status: 'MATCHED',
                         liveness_score: 0.99,
                         device: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Kiosk',
-                        created_at: new Date().toISOString()
+                        created_at: nowIso
                     };
 
+                    if (supabaseClient) {
+                        try {
+                            const { error } = await supabaseClient.from('attendance_records').insert(record);
+                            if (error) throw error;
+                        } catch (err) {
+                            console.error('Gagal menyimpan absensi ke Supabase:', err);
+                            alert('Absensi tercatat di layar ini saja — GAGAL sync ke database. Periksa koneksi internet lalu ulangi absen.');
+                        }
+                    }
+
+                    setIsVerifying(false);
                     setAttendanceRecords(prev => [record, ...prev]);
                     setVerificationResult(record);
 
@@ -364,37 +450,74 @@
                 setShowStaffModal(true);
             };
 
-            const handlePhotoFileUpload = (e) => {
+            const handlePhotoFileUpload = async (e) => {
                 const file = e.target.files[0];
-                if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert('Ukuran file foto terlalu besar! Maksimal 5MB.');
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setEmpForm(prev => ({ ...prev, masterPhoto: reader.result }));
-                    };
-                    reader.readAsDataURL(file);
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ukuran file foto terlalu besar! Maksimal 5MB.');
+                    return;
                 }
+
+                // Prefer uploading to Supabase Storage so the photo is visible from every device.
+                if (supabaseClient) {
+                    try {
+                        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+                        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                        const { error: uploadError } = await supabaseClient.storage
+                            .from('staff-photos')
+                            .upload(path, file, { contentType: file.type });
+                        if (uploadError) throw uploadError;
+                        const { data: publicUrlData } = supabaseClient.storage.from('staff-photos').getPublicUrl(path);
+                        if (publicUrlData?.publicUrl) {
+                            setEmpForm(prev => ({ ...prev, masterPhoto: publicUrlData.publicUrl }));
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('Gagal upload foto staff ke Supabase Storage, memakai foto lokal (tidak sync):', err);
+                    }
+                }
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setEmpForm(prev => ({ ...prev, masterPhoto: reader.result }));
+                };
+                reader.readAsDataURL(file);
             };
 
-            const handleSaveStaff = (e) => {
+            const handleSaveStaff = async (e) => {
                 e.preventDefault();
                 if (!empForm.name) return;
 
+                const empRow = {
+                    name: empForm.name, phone: empForm.phone, role: empForm.role,
+                    store_id: empForm.storeId, shift: empForm.shift, is_driver: empForm.isDriver, master_photo: empForm.masterPhoto
+                };
+
                 if (editingEmp) {
                     setEmployees(prev => prev.map(emp => emp.id === editingEmp.id ? { ...emp, ...empForm } : emp));
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.from('employees').update(empRow).eq('id', editingEmp.id);
+                        if (error) { console.error(error); alert('Gagal menyimpan perubahan staff ke database.'); }
+                    }
                 } else {
-                    const newEmp = { id: 'EMP' + Date.now().toString().slice(-4), ...empForm };
+                    const newId = 'EMP' + Date.now().toString().slice(-4);
+                    const newEmp = { id: newId, ...empForm };
                     setEmployees(prev => [newEmp, ...prev]);
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.from('employees').insert({ id: newId, ...empRow });
+                        if (error) { console.error(error); alert('Gagal menyimpan staff baru ke database.'); }
+                    }
                 }
                 setShowStaffModal(false);
             };
 
-            const handleDeleteStaff = (empId) => {
+            const handleDeleteStaff = async (empId) => {
                 setEmployees(prev => prev.filter(e => e.id !== empId));
                 setDeleteConfirmEmp(null);
+                if (supabaseClient) {
+                    const { error } = await supabaseClient.from('employees').delete().eq('id', empId);
+                    if (error) { console.error(error); alert('Gagal menghapus staff dari database.'); }
+                }
             };
 
             const openAddStoreModal = () => {
@@ -409,22 +532,35 @@
                 setShowStoreModal(true);
             };
 
-            const handleSaveStore = (e) => {
+            const handleSaveStore = async (e) => {
                 e.preventDefault();
                 if (!storeForm.name || !storeForm.code) return;
 
                 if (editingStore) {
                     setStores(prev => prev.map(s => s.id === editingStore.id ? { ...s, ...storeForm } : s));
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.from('stores').update(storeForm).eq('id', editingStore.id);
+                        if (error) { console.error(error); alert('Gagal menyimpan perubahan store ke database.'); }
+                    }
                 } else {
-                    const newStore = { id: 'S' + Date.now().toString().slice(-4), ...storeForm };
+                    const newId = 'S' + Date.now().toString().slice(-4);
+                    const newStore = { id: newId, ...storeForm };
                     setStores(prev => [...prev, newStore]);
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.from('stores').insert(newStore);
+                        if (error) { console.error(error); alert('Gagal menyimpan store baru ke database.'); }
+                    }
                 }
                 setShowStoreModal(false);
             };
 
-            const handleDeleteStore = (stId) => {
+            const handleDeleteStore = async (stId) => {
                 setStores(prev => prev.filter(s => s.id !== stId));
                 setDeleteConfirmStore(null);
+                if (supabaseClient) {
+                    const { error } = await supabaseClient.from('stores').delete().eq('id', stId);
+                    if (error) { console.error(error); alert('Gagal menghapus store dari database.'); }
+                }
             };
 
             const openAddRoleModal = () => {
@@ -439,7 +575,7 @@
                 setShowRoleModal(true);
             };
 
-            const handleSaveRole = (e) => {
+            const handleSaveRole = async (e) => {
                 e.preventDefault();
                 const trimmed = roleForm.name.trim();
                 if (!trimmed) return;
@@ -448,23 +584,45 @@
                     const oldRoleName = roles[editingRoleIndex];
                     setRoles(prev => prev.map((r, idx) => idx === editingRoleIndex ? trimmed : r));
                     setEmployees(prev => prev.map(emp => emp.role === oldRoleName ? { ...emp, role: trimmed } : emp));
+                    if (supabaseClient) {
+                        // roles.name is referenced by employees.role with ON UPDATE CASCADE,
+                        // so renaming here also updates every employee row automatically.
+                        const { error } = await supabaseClient.from('roles').update({ name: trimmed }).eq('name', oldRoleName);
+                        if (error) { console.error(error); alert('Gagal mengubah nama jabatan di database.'); }
+                    }
                 } else {
                     if (roles.includes(trimmed)) {
                         alert('Jabatan ini sudah ada dalam daftar!');
                         return;
                     }
                     setRoles(prev => [...prev, trimmed]);
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.from('roles').insert({ name: trimmed });
+                        if (error) { console.error(error); alert('Gagal menyimpan jabatan baru ke database.'); }
+                    }
                 }
                 setShowRoleModal(false);
             };
 
-            const handleDeleteRole = (roleToDelete) => {
+            const handleDeleteRole = async (roleToDelete) => {
                 setRoles(prev => prev.filter(r => r !== roleToDelete));
                 setDeleteConfirmRole(null);
+                if (supabaseClient) {
+                    const { error } = await supabaseClient.from('roles').delete().eq('name', roleToDelete);
+                    if (error) { console.error(error); alert('Gagal menghapus jabatan dari database.'); }
+                }
             };
 
             return (
                 <div className="min-h-screen flex flex-col justify-between">
+                    {isLoadingData && (
+                        <div className="fixed inset-0 bg-white/85 backdrop-blur-sm z-[60] flex items-center justify-center">
+                            <div className="text-center space-y-3">
+                                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                <p className="text-xs font-bold text-slate-600">Memuat data dari database Supabase...</p>
+                            </div>
+                        </div>
+                    )}
                     {}
                     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
