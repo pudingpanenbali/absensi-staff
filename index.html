@@ -121,6 +121,63 @@
             return detection ? detection.descriptor : null;
         };
 
+        // --- Mandatory GPS location for attendance ---
+        // Requires HTTPS (or localhost) — browsers block the Geolocation API on plain
+        // http:// pages, so this will only work once deployed (e.g. on Vercel), not when
+        // opening index.html directly as a local file.
+        const getCurrentLocation = () => new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error('Perangkat/browser ini tidak mendukung deteksi lokasi (GPS). Absensi tidak bisa dilanjutkan.'));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                }),
+                (err) => {
+                    let msg = 'Gagal mendapatkan lokasi GPS. Absensi tidak bisa dilanjutkan tanpa lokasi.';
+                    if (err.code === err.PERMISSION_DENIED) {
+                        msg = 'Izin Lokasi ditolak. Aktifkan izin Lokasi untuk browser/HP ini di pengaturan, lalu coba lagi. Absensi tidak bisa dipakai tanpa lokasi.';
+                    } else if (err.code === err.TIMEOUT) {
+                        msg = 'Deteksi lokasi terlalu lama (timeout). Pastikan GPS aktif & sinyal cukup, lalu coba lagi.';
+                    }
+                    reject(new Error(msg));
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        });
+
+        // Turns lat/lng into a human-readable address via OpenStreetMap's free Nominatim API
+        // (no API key needed). Never throws — falls back to raw coordinates if it fails,
+        // since a missing address string shouldn't block an otherwise-valid, located check-in.
+        const reverseGeocode = async (latitude, longitude) => {
+            try {
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+                    { headers: { 'Accept-Language': 'id' } }
+                );
+                if (!res.ok) throw new Error('Reverse geocoding gagal, status ' + res.status);
+                const data = await res.json();
+                return data?.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            } catch (err) {
+                console.error('Gagal reverse geocode lokasi:', err);
+                return `${latitude.toFixed(5)}, ${longitude.toFixed(5)} (alamat tidak bisa dimuat)`;
+            }
+        };
+
+        // --- Driver work-hours & overtime (no fixed shift for drivers) ---
+        const DRIVER_STANDARD_MINUTES = 9 * 60; // drivers' standard work day = 9 hours
+
+        // Overtime is counted in whole-hour blocks: minutes past the 9-hour mark are
+        // rounded to the NEAREST hour (>=30 min rounds up, <30 min rounds down),
+        // per how the owner wants driver overtime paid.
+        const calculateDriverOvertimeHours = (overtimeMinutes) => {
+            if (overtimeMinutes <= 0) return 0;
+            return Math.round(overtimeMinutes / 60);
+        };
+
         const INITIAL_STORES = [
             { id: 'S1', code: 'OUT-01', name: 'Outlet Seminyak', address: 'Jl. Kayu Aya No. 12, Seminyak' },
             { id: 'S2', code: 'OUT-02', name: 'Outlet Ubud', address: 'Jl. Raya Ubud No. 45, Ubud' },
@@ -193,6 +250,10 @@
             // otherwise there'd be no way to actually verify a face (see modelsLoaded gate below).
             const [modelsLoaded, setModelsLoaded] = useState(false);
             const [modelsLoadError, setModelsLoadError] = useState('');
+
+            // Mandatory GPS location — attendance cannot proceed without this being set.
+            const [capturedLocation, setCapturedLocation] = useState(null);
+            const [isGettingLocation, setIsGettingLocation] = useState(false);
 
             // Staff Management Modal & Photo Source States
             const [showStaffModal, setShowStaffModal] = useState(false);
@@ -316,6 +377,23 @@
                 return lateDiff > 0 ? lateDiff : 0;
             };
 
+            // Location is mandatory: attendance cannot proceed to camera without a GPS fix.
+            // Shared by both the normal path and the "confirmed late" path so neither can
+            // skip the location requirement.
+            const proceedToCameraStep = async () => {
+                setIsGettingLocation(true);
+                try {
+                    const loc = await getCurrentLocation();
+                    setCapturedLocation(loc);
+                    setIsGettingLocation(false);
+                    setKioskStep(2);
+                    startCamera();
+                } catch (err) {
+                    setIsGettingLocation(false);
+                    alert(err.message || 'Gagal mendapatkan lokasi. Aktifkan GPS/izin lokasi lalu coba lagi.');
+                }
+            };
+
             const handleProceedToCamera = () => {
                 if (!modelsLoaded) {
                     alert(modelsLoadError || 'Model AI Face Recognition masih dimuat, tunggu beberapa detik lalu coba lagi.');
@@ -330,7 +408,12 @@
                     return;
                 }
 
-                if (attendanceType === 'CHECK_IN') {
+                const selectedEmpForFlow = employees.find(e => e.id === selectedEmpId);
+                const isDriverFlow = !!selectedEmpForFlow?.isDriver;
+
+                // Drivers don't pick a shift and have no fixed start time, so lateness
+                // doesn't apply to them — only total hours worked (see finalizeAttendance).
+                if (!isDriverFlow && attendanceType === 'CHECK_IN') {
                     const lateMins = calculateLateMinutes(selectedShift);
                     if (lateMins > 0 && !hasFilledLateForm) {
                         setLateMinutesCount(lateMins);
@@ -340,8 +423,7 @@
                     }
                 }
 
-                setKioskStep(2);
-                startCamera();
+                proceedToCameraStep();
             };
 
             const handleConfirmLateForm = (isYes) => {
@@ -349,8 +431,7 @@
                     setHasFilledLateForm(true);
                     setShowLateModal(false);
                     setLateWarningAlert('');
-                    setKioskStep(2);
-                    startCamera();
+                    proceedToCameraStep();
                 } else {
                     setLateWarningAlert('⚠️ Kamu HARUS mengisi Form Datang Terlambat di WhatsApp Group terlebih dahulu! Setelah diisi, klik "Ya, Sudah Isi" untuk melanjutkan.');
                 }
@@ -406,6 +487,11 @@
                     setVerificationError('Karyawan ini belum punya foto master wajah tersimpan. Minta admin melengkapi foto di menu Kelola Staff.');
                     return;
                 }
+                if (!capturedLocation) {
+                    setIsVerifying(false);
+                    setVerificationError('Lokasi GPS tidak terdeteksi. Absensi tidak bisa dipakai tanpa lokasi — ulangi proses absen dari awal.');
+                    return;
+                }
 
                 try {
                     const [masterImg, capturedDescriptor] = await Promise.all([
@@ -443,11 +529,75 @@
                 }
             };
 
+            // Finds this employee's most recent CHECK_IN today that hasn't been paired with
+            // a checkout yet, so we can compute how many hours they actually worked.
+            // Checks Supabase first (source of truth across devices), falls back to local
+            // state if offline.
+            const findLatestOpenCheckIn = async (employeeId) => {
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+
+                if (supabaseClient) {
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from('attendance_records')
+                            .select('*')
+                            .eq('employee_id', employeeId)
+                            .eq('attendance_type', 'CHECK_IN')
+                            .gte('created_at', startOfDay.toISOString())
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+                        if (error) throw error;
+                        return data && data[0] ? data[0] : null;
+                    } catch (err) {
+                        console.error('Gagal mencari absen masuk sebelumnya:', err);
+                        return null;
+                    }
+                }
+
+                const localMatch = attendanceRecords.find(r =>
+                    r.employee_id === employeeId &&
+                    r.attendance_type === 'CHECK_IN' &&
+                    new Date(r.created_at) >= startOfDay
+                );
+                return localMatch || null;
+            };
+
             // Only reached after a confirmed face match — writes the attendance record.
             const finalizeAttendance = async (photoData, selectedEmp, selectedStore, confidencePct) => {
-                const lateMins = calculateLateMinutes(selectedShift);
-                const isLate = attendanceType === 'CHECK_IN' && lateMins > 0;
+                const isDriverFlow = !!selectedEmp?.isDriver;
+
+                // Drivers have no fixed shift/start time, so lateness doesn't apply to them.
+                const lateMins = isDriverFlow ? 0 : calculateLateMinutes(selectedShift);
+                const isLate = !isDriverFlow && attendanceType === 'CHECK_IN' && lateMins > 0;
+                const shiftLabel = isDriverFlow ? 'Sopir - Fleksibel (Standar 9 Jam/Hari)' : selectedShift;
                 const nowIso = new Date().toISOString();
+
+                // Driver-only: pair this checkout with today's check-in to compute hours worked
+                // and overtime. Overtime = minutes past the 9-hour standard, rounded to the
+                // nearest whole hour (>=30 min rounds up, <30 min rounds down).
+                let workedMinutes = null;
+                let overtimeMinutes = 0;
+                let overtimeHours = 0;
+
+                if (isDriverFlow && attendanceType === 'CHECK_OUT') {
+                    const openCheckIn = await findLatestOpenCheckIn(selectedEmp.id);
+                    if (openCheckIn) {
+                        const checkInTime = new Date(openCheckIn.check_in || openCheckIn.created_at);
+                        const checkOutTime = new Date(nowIso);
+                        workedMinutes = Math.max(0, Math.round((checkOutTime - checkInTime) / 60000));
+                        const rawOvertimeMinutes = Math.max(0, workedMinutes - DRIVER_STANDARD_MINUTES);
+                        overtimeMinutes = rawOvertimeMinutes;
+                        overtimeHours = calculateDriverOvertimeHours(rawOvertimeMinutes);
+                    }
+                }
+
+                // Turn the mandatory GPS fix into a human-readable address for the report.
+                // capturedLocation is guaranteed set here — runFaceVerification already
+                // rejects the attempt earlier if it's missing.
+                const locationAddress = capturedLocation
+                    ? await reverseGeocode(capturedLocation.latitude, capturedLocation.longitude)
+                    : 'Lokasi tidak tersedia';
 
                 // Upload the captured photo to Supabase Storage so all devices can see it
                 // (storing raw base64 in the DB row would bloat the table fast).
@@ -474,13 +624,22 @@
                     master_photo_ref: selectedEmp?.masterPhoto || '',
                     captured_photo: photoUrl,
                     store_name: selectedStore?.name || 'Outlet Seminyak',
-                    shift: selectedShift,
+                    shift: shiftLabel,
                     role: selectedEmp?.role || 'Staff',
                     check_in: attendanceType === 'CHECK_IN' ? nowIso : null,
                     check_out: attendanceType === 'CHECK_OUT' ? nowIso : null,
                     attendance_type: attendanceType,
                     is_late: isLate,
                     late_minutes: lateMins,
+                    // Driver-only work-hour tracking (null/0 for non-drivers and for check-ins).
+                    worked_minutes: workedMinutes,
+                    overtime_minutes: overtimeMinutes,
+                    overtime_hours: overtimeHours,
+                    // Mandatory GPS location, resolved to a readable address for the report.
+                    latitude: capturedLocation?.latitude ?? null,
+                    longitude: capturedLocation?.longitude ?? null,
+                    location_accuracy: capturedLocation?.accuracy ?? null,
+                    location_address: locationAddress,
                     confidence: Number(confidencePct.toFixed(2)),
                     match_status: 'MATCHED',
                     // NOTE: this is NOT a real liveness/anti-spoofing check — face-api.js only
@@ -518,6 +677,7 @@
                 setCapturedPhoto(null);
                 setVerificationResult(null);
                 setVerificationError('');
+                setCapturedLocation(null);
             };
 
             const retryCapture = () => {
@@ -740,6 +900,10 @@
                 }
             };
 
+            // Drivers don't pick a shift — their hours are computed from check-in/check-out timestamps.
+            const selectedEmpForKiosk = employees.find(e => e.id === selectedEmpId);
+            const isDriverSelected = !!selectedEmpForKiosk?.isDriver;
+
             return (
                 <div className="min-h-screen flex flex-col justify-between">
                     {isLoadingData && (
@@ -763,33 +927,34 @@
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2 sm:space-x-3">
-                                <button 
+                            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+                                <button
                                     onClick={() => setShowConfigModal(true)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all border ${
-                                        isConnected 
-                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                                        isConnected
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                             : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                                     }`}
                                 >
                                     <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                                    <span>{isConnected ? 'Database Online' : 'Database Offline'}</span>
+                                    <span className="hidden sm:inline">{isConnected ? 'Database Online' : 'Database Offline'}</span>
                                     <i className="fa-solid fa-gear text-xs ml-1 opacity-70"></i>
                                 </button>
 
                                 {isSuperAdmin ? (
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <span className="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 rounded-lg font-bold border border-amber-300 flex items-center gap-1.5">
-                                            <i className="fa-solid fa-user-shield"></i> Super Admin Mode
+                                            <i className="fa-solid fa-user-shield"></i>
+                                            <span className="hidden sm:inline">Super Admin Mode</span>
                                         </span>
-                                        <button 
+                                        <button
                                             onClick={() => setShowChangePinModal(true)}
                                             className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-300 transition-all flex items-center gap-1.5"
                                         >
                                             <i className="fa-solid fa-key text-xs"></i>
-                                            <span>Ganti PIN</span>
+                                            <span className="hidden sm:inline">Ganti PIN</span>
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => { setIsSuperAdmin(false); setActiveTab('kiosk'); }}
                                             className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-rose-200 transition-all"
                                         >
@@ -797,7 +962,7 @@
                                         </button>
                                     </div>
                                 ) : (
-                                    <button 
+                                    <button
                                         onClick={() => setShowLoginModal(true)}
                                         className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold transition-all shadow-sm flex items-center space-x-1.5"
                                     >
@@ -940,29 +1105,13 @@
                                                 </select>
                                             </div>
 
-                                            {/* Shift Selection */}
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                                                    <i className="fa-solid fa-clock text-amber-600"></i> Pilih Shift Kerja Hari Ini
-                                                </label>
-                                                <select 
-                                                    value={selectedShift} 
-                                                    onChange={(e) => setSelectedShift(e.target.value)}
-                                                    className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
-                                                >
-                                                    <option value="Shift Pagi (07:00 - 15:00)">Shift Pagi (07:00 - 15:00)</option>
-                                                    <option value="Shift Siang (14:00 - 22:00)">Shift Siang (14:00 - 22:00)</option>
-                                                    <option value="Shift Full (08:00 - 20:00)">Shift Full (08:00 - 20:00)</option>
-                                                </select>
-                                            </div>
-
                                             {/* Staff Selection */}
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                                                     <i className="fa-solid fa-user text-amber-600"></i> Pilih Nama Karyawan / Staff
                                                 </label>
-                                                <select 
-                                                    value={selectedEmpId} 
+                                                <select
+                                                    value={selectedEmpId}
                                                     onChange={(e) => setSelectedEmpId(e.target.value)}
                                                     className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
                                                 >
@@ -974,15 +1123,52 @@
                                                     ))}
                                                 </select>
                                             </div>
+
+                                            {/* Shift Selection — hidden for drivers, whose hours come from check-in/check-out timestamps instead */}
+                                            {isDriverSelected ? (
+                                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-800 font-semibold flex items-start gap-2">
+                                                    <i className="fa-solid fa-truck-fast mt-0.5"></i>
+                                                    <span>Sebagai Sopir, tidak perlu pilih shift. Jam kerja dihitung otomatis dari jam Absen Masuk & Absen Pulang (standar 9 jam/hari, lebih dari itu dihitung lembur per kelipatan 60 menit).</span>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                                        <i className="fa-solid fa-clock text-amber-600"></i> Pilih Shift Kerja Hari Ini
+                                                    </label>
+                                                    <select
+                                                        value={selectedShift}
+                                                        onChange={(e) => setSelectedShift(e.target.value)}
+                                                        className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
+                                                    >
+                                                        <option value="Shift Pagi (07:00 - 15:00)">Shift Pagi (07:00 - 15:00)</option>
+                                                        <option value="Shift Siang (14:00 - 22:00)">Shift Siang (14:00 - 22:00)</option>
+                                                        <option value="Shift Full (08:00 - 20:00)">Shift Full (08:00 - 20:00)</option>
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <button 
+                                        <button
                                             onClick={handleProceedToCamera}
-                                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-amber-200 transition-all transform active:scale-95 flex items-center justify-center space-x-2"
+                                            disabled={isGettingLocation}
+                                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-amber-200 transition-all transform active:scale-95 flex items-center justify-center space-x-2"
                                         >
-                                            <span>Lanjut ke Scan Wajah AI</span>
-                                            <i className="fa-solid fa-camera"></i>
+                                            {isGettingLocation ? (
+                                                <>
+                                                    <i className="fa-solid fa-location-crosshairs animate-pulse"></i>
+                                                    <span>Mendeteksi Lokasi GPS...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Lanjut ke Scan Wajah AI</span>
+                                                    <i className="fa-solid fa-camera"></i>
+                                                </>
+                                            )}
                                         </button>
+                                        <p className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
+                                            <i className="fa-solid fa-location-dot"></i>
+                                            Absensi wajib mengaktifkan izin Lokasi/GPS
+                                        </p>
                                     </div>
                                 )}
 
@@ -1057,9 +1243,21 @@
                                                             <p className="text-[10px] text-emerald-600 mt-1">
                                                                 Kemiripan wajah: {verificationResult.confidence}%
                                                             </p>
+                                                            {verificationResult.location_address && (
+                                                                <p className="text-[10px] text-emerald-700 mt-1 flex items-start justify-center gap-1">
+                                                                    <i className="fa-solid fa-location-dot mt-0.5"></i>
+                                                                    <span>{verificationResult.location_address}</span>
+                                                                </p>
+                                                            )}
                                                             {verificationResult.is_late && (
                                                                 <span className="inline-block mt-2 bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-300">
                                                                     ⚠️ Terlambat {verificationResult.late_minutes} Menit
+                                                                </span>
+                                                            )}
+                                                            {verificationResult.attendance_type === 'CHECK_OUT' && verificationResult.worked_minutes != null && (
+                                                                <span className="inline-block mt-2 bg-sky-100 text-sky-800 text-xs font-black px-3 py-1 rounded-full border border-sky-300">
+                                                                    🕒 Kerja {Math.floor(verificationResult.worked_minutes / 60)}j {verificationResult.worked_minutes % 60}m
+                                                                    {verificationResult.overtime_hours > 0 ? ` • Lembur ${verificationResult.overtime_hours} Jam` : ''}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1107,13 +1305,16 @@
                                                         <th className="p-4">Foto AI</th>
                                                         <th className="p-4">Karyawan & Jabatan</th>
                                                         <th className="p-4">Store & Shift</th>
+                                                        <th className="p-4">Lokasi Absen</th>
                                                         <th className="p-4">Waktu Absen</th>
                                                         <th className="p-4">Tipe Absen</th>
-                                                        <th className="p-4">Status Keterlambatan</th>
+                                                        <th className="p-4">Status / Jam Kerja</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {attendanceRecords.map((rec) => (
+                                                    {attendanceRecords.map((rec) => {
+                                                        const isDriverRecord = typeof rec.shift === 'string' && rec.shift.startsWith('Sopir');
+                                                        return (
                                                         <tr key={rec.id} className="hover:bg-slate-50 transition-all">
                                                             <td className="p-4">
                                                                 <img src={rec.captured_photo} className="w-10 h-10 rounded-xl object-cover border border-amber-400 shadow-sm" />
@@ -1126,20 +1327,54 @@
                                                                 <span className="font-semibold text-slate-800">{rec.store_name}</span>
                                                                 <p className="text-[10px] text-slate-400">{rec.shift}</p>
                                                             </td>
+                                                            <td className="p-4 max-w-[200px]">
+                                                                {rec.location_address ? (
+                                                                    <div className="space-y-0.5">
+                                                                        <p className="text-[10px] text-slate-600 break-words">{rec.location_address}</p>
+                                                                        {rec.latitude != null && rec.longitude != null && (
+                                                                            <a
+                                                                                href={`https://www.google.com/maps?q=${rec.latitude},${rec.longitude}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-[10px] text-sky-600 font-bold hover:underline inline-block"
+                                                                            >
+                                                                                Lihat di Peta ↗
+                                                                            </a>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-400">-</span>
+                                                                )}
+                                                            </td>
                                                             <td className="p-4 font-mono font-medium text-slate-600">
                                                                 {new Date(rec.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WITA
                                                             </td>
                                                             <td className="p-4">
                                                                 <span className={`px-2.5 py-1 rounded-lg font-extrabold text-[10px] ${
-                                                                    rec.attendance_type === 'CHECK_IN' 
-                                                                        ? 'bg-emerald-100 text-emerald-800' 
+                                                                    rec.attendance_type === 'CHECK_IN'
+                                                                        ? 'bg-emerald-100 text-emerald-800'
                                                                         : 'bg-rose-100 text-rose-800'
                                                                 }`}>
                                                                     {rec.attendance_type === 'CHECK_IN' ? 'MASUK' : 'PULANG'}
                                                                 </span>
                                                             </td>
                                                             <td className="p-4">
-                                                                {rec.is_late ? (
+                                                                {rec.worked_minutes != null ? (
+                                                                    <div className="space-y-1">
+                                                                        <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-sky-200 inline-block">
+                                                                            🕒 {Math.floor(rec.worked_minutes / 60)}j {rec.worked_minutes % 60}m
+                                                                        </span>
+                                                                        {rec.overtime_hours > 0 && (
+                                                                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-amber-200 inline-block">
+                                                                                Lembur {rec.overtime_hours} Jam
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                ) : isDriverRecord ? (
+                                                                    <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200">
+                                                                        🚚 Sopir (Tanpa Shift)
+                                                                    </span>
+                                                                ) : rec.is_late ? (
                                                                     <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-rose-200">
                                                                         ⚠️ Terlambat {rec.late_minutes} Mins
                                                                     </span>
@@ -1150,7 +1385,8 @@
                                                                 )}
                                                             </td>
                                                         </tr>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1408,7 +1644,7 @@
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-[11px] font-bold text-slate-700 mb-1">Jabatan / Role</label>
                                             <select 
