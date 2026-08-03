@@ -23,6 +23,9 @@
     
     <!-- Supabase JS Client CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- face-api.js: real client-side face detection & recognition (replaces the previous hardcoded "always matched" placeholder) -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
     <!-- Canvas Confetti CDN -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -90,6 +93,34 @@
             storeId: e.store_id, shift: e.shift, isDriver: e.is_driver, masterPhoto: e.master_photo
         });
 
+        // --- Real face verification (face-api.js) ---
+        // Model weights hosted on the face-api.js GitHub repo via jsDelivr's gh proxy.
+        const FACE_MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+        // face-api.js docs recommend ~0.6 euclidean distance as the match/no-match cutoff
+        // for its 128-d face descriptors (same scale used by their FaceMatcher default).
+        const FACE_MATCH_THRESHOLD = 0.6;
+
+        // Loads an <img> element from a URL so face-api.js can run detection on it.
+        // crossOrigin='anonymous' is required or the canvas becomes "tainted" and
+        // detection throws — this means the image host MUST send permissive CORS
+        // headers (Supabase Storage public buckets and images.unsplash.com both do).
+        const loadImageElement = (src) => new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('Gagal memuat gambar untuk verifikasi wajah (cek URL foto / CORS).'));
+            img.src = src;
+        });
+
+        // Returns a 128-d face descriptor (Float32Array) for the first face found, or null if none found.
+        const getFaceDescriptor = async (input) => {
+            const detection = await window.faceapi
+                .detectSingleFace(input, new window.faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            return detection ? detection.descriptor : null;
+        };
+
         const INITIAL_STORES = [
             { id: 'S1', code: 'OUT-01', name: 'Outlet Seminyak', address: 'Jl. Kayu Aya No. 12, Seminyak' },
             { id: 'S2', code: 'OUT-02', name: 'Outlet Ubud', address: 'Jl. Raya Ubud No. 45, Ubud' },
@@ -156,6 +187,12 @@
             const [capturedPhoto, setCapturedPhoto] = useState(null);
             const [isVerifying, setIsVerifying] = useState(false);
             const [verificationResult, setVerificationResult] = useState(null);
+            const [verificationError, setVerificationError] = useState('');
+
+            // Face-api.js model loading state — kiosk must not proceed until real models are ready,
+            // otherwise there'd be no way to actually verify a face (see modelsLoaded gate below).
+            const [modelsLoaded, setModelsLoaded] = useState(false);
+            const [modelsLoadError, setModelsLoadError] = useState('');
 
             // Staff Management Modal & Photo Source States
             const [showStaffModal, setShowStaffModal] = useState(false);
@@ -180,6 +217,23 @@
 
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
+
+            // Load face-api.js models once on mount. Real verification cannot run until this finishes.
+            useEffect(() => {
+                let cancelled = false;
+                (async () => {
+                    try {
+                        await window.faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL);
+                        await window.faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODELS_URL);
+                        await window.faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL);
+                        if (!cancelled) setModelsLoaded(true);
+                    } catch (err) {
+                        console.error('Gagal memuat model AI Face Recognition:', err);
+                        if (!cancelled) setModelsLoadError('Model AI Face Recognition gagal dimuat. Periksa koneksi internet, lalu refresh halaman.');
+                    }
+                })();
+                return () => { cancelled = true; };
+            }, []);
 
             useEffect(() => {
                 const cleanUrl = sanitizeUrl(supabaseUrl);
@@ -263,6 +317,10 @@
             };
 
             const handleProceedToCamera = () => {
+                if (!modelsLoaded) {
+                    alert(modelsLoadError || 'Model AI Face Recognition masih dimuat, tunggu beberapa detik lalu coba lagi.');
+                    return;
+                }
                 if (!selectedEmpId) {
                     alert('Mohon pilih nama karyawan terlebih dahulu!');
                     return;
@@ -316,7 +374,7 @@
                 canvasRef.current.width = videoRef.current.videoWidth || 640;
                 canvasRef.current.height = videoRef.current.videoHeight || 480;
                 context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-                
+
                 const photoData = canvasRef.current.toDataURL('image/jpeg');
                 setCapturedPhoto(photoData);
 
@@ -324,72 +382,133 @@
                     videoRef.current.srcObject.getTracks().forEach(track => track.stop());
                 }
                 setIsCameraActive(false);
-
+                setVerificationError('');
                 setIsVerifying(true);
-                setTimeout(async () => {
-                    const selectedEmp = employees.find(e => e.id === selectedEmpId);
-                    const selectedStore = stores.find(s => s.id === selectedStoreId);
-                    const lateMins = calculateLateMinutes(selectedShift);
-                    const isLate = attendanceType === 'CHECK_IN' && lateMins > 0;
-                    const nowIso = new Date().toISOString();
 
-                    // Upload the captured photo to Supabase Storage so all devices can see it
-                    // (storing raw base64 in the DB row would bloat the table fast).
-                    let photoUrl = photoData;
-                    if (supabaseClient) {
-                        try {
-                            const blob = dataUrlToBlob(photoData);
-                            const path = `${selectedEmp?.id || 'unknown'}/${Date.now()}.jpg`;
-                            const { error: uploadError } = await supabaseClient.storage
-                                .from('attendance-photos')
-                                .upload(path, blob, { contentType: 'image/jpeg' });
-                            if (uploadError) throw uploadError;
-                            const { data: publicUrlData } = supabaseClient.storage.from('attendance-photos').getPublicUrl(path);
-                            if (publicUrlData?.publicUrl) photoUrl = publicUrlData.publicUrl;
-                        } catch (err) {
-                            console.error('Gagal upload foto absensi ke Supabase Storage:', err);
-                        }
-                    }
+                runFaceVerification(photoData);
+            };
 
-                    const record = {
-                        id: 'ATT-' + Date.now(),
-                        employee_id: selectedEmp?.id || 'EMP-UNKNOWN',
-                        employee_name: selectedEmp?.name || 'Staff',
-                        master_photo_ref: selectedEmp?.masterPhoto || '',
-                        captured_photo: photoUrl,
-                        store_name: selectedStore?.name || 'Outlet Seminyak',
-                        shift: selectedShift,
-                        role: selectedEmp?.role || 'Staff',
-                        check_in: attendanceType === 'CHECK_IN' ? nowIso : null,
-                        check_out: attendanceType === 'CHECK_OUT' ? nowIso : null,
-                        attendance_type: attendanceType,
-                        is_late: isLate,
-                        late_minutes: lateMins,
-                        confidence: 98.4,
-                        match_status: 'MATCHED',
-                        liveness_score: 0.99,
-                        device: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Kiosk',
-                        created_at: nowIso
-                    };
+            // Does the ACTUAL face comparison: captured photo descriptor vs the selected
+            // employee's master photo descriptor. Anything that isn't a confirmed match
+            // (no face found, mismatch, load/CORS error) is treated as a rejection —
+            // it never falls back to "assume matched".
+            const runFaceVerification = async (photoData) => {
+                const selectedEmp = employees.find(e => e.id === selectedEmpId);
+                const selectedStore = stores.find(s => s.id === selectedStoreId);
 
-                    if (supabaseClient) {
-                        try {
-                            const { error } = await supabaseClient.from('attendance_records').insert(record);
-                            if (error) throw error;
-                        } catch (err) {
-                            console.error('Gagal menyimpan absensi ke Supabase:', err);
-                            alert('Absensi tercatat di layar ini saja — GAGAL sync ke database. Periksa koneksi internet lalu ulangi absen.');
-                        }
-                    }
-
+                if (!modelsLoaded) {
                     setIsVerifying(false);
-                    setAttendanceRecords(prev => [record, ...prev]);
-                    setVerificationResult(record);
+                    setVerificationError('Model AI Face Recognition belum siap. Tunggu sebentar lalu ulangi absen.');
+                    return;
+                }
+                if (!selectedEmp || !selectedEmp.masterPhoto) {
+                    setIsVerifying(false);
+                    setVerificationError('Karyawan ini belum punya foto master wajah tersimpan. Minta admin melengkapi foto di menu Kelola Staff.');
+                    return;
+                }
 
-                    if (window.confetti) {
-                        window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+                try {
+                    const [masterImg, capturedDescriptor] = await Promise.all([
+                        loadImageElement(selectedEmp.masterPhoto),
+                        getFaceDescriptor(canvasRef.current)
+                    ]);
+                    const masterDescriptor = await getFaceDescriptor(masterImg);
+
+                    if (!capturedDescriptor) {
+                        setIsVerifying(false);
+                        setVerificationError('Wajah tidak terdeteksi di foto yang baru diambil. Pastikan wajah terlihat jelas & pencahayaan cukup, lalu coba lagi.');
+                        return;
                     }
-                }, 1500);
+                    if (!masterDescriptor) {
+                        setIsVerifying(false);
+                        setVerificationError('Wajah tidak terdeteksi di foto master karyawan ini. Minta admin mengganti foto master dengan foto wajah yang lebih jelas.');
+                        return;
+                    }
+
+                    const distance = window.faceapi.euclideanDistance(masterDescriptor, capturedDescriptor);
+                    const isMatch = distance < FACE_MATCH_THRESHOLD;
+                    const confidencePct = Math.max(0, Math.min(100, (1 - distance) * 100));
+
+                    if (!isMatch) {
+                        setIsVerifying(false);
+                        setVerificationError(`Wajah TIDAK COCOK dengan data karyawan "${selectedEmp.name}" (kemiripan ${confidencePct.toFixed(1)}%, ambang batas 40%). Absensi DITOLAK dan tidak dicatat.`);
+                        return;
+                    }
+
+                    await finalizeAttendance(photoData, selectedEmp, selectedStore, confidencePct);
+                } catch (err) {
+                    console.error('Gagal verifikasi wajah:', err);
+                    setIsVerifying(false);
+                    setVerificationError('Gagal memproses verifikasi wajah (kemungkinan foto master tidak bisa diakses). Coba lagi atau hubungi admin.');
+                }
+            };
+
+            // Only reached after a confirmed face match — writes the attendance record.
+            const finalizeAttendance = async (photoData, selectedEmp, selectedStore, confidencePct) => {
+                const lateMins = calculateLateMinutes(selectedShift);
+                const isLate = attendanceType === 'CHECK_IN' && lateMins > 0;
+                const nowIso = new Date().toISOString();
+
+                // Upload the captured photo to Supabase Storage so all devices can see it
+                // (storing raw base64 in the DB row would bloat the table fast).
+                let photoUrl = photoData;
+                if (supabaseClient) {
+                    try {
+                        const blob = dataUrlToBlob(photoData);
+                        const path = `${selectedEmp?.id || 'unknown'}/${Date.now()}.jpg`;
+                        const { error: uploadError } = await supabaseClient.storage
+                            .from('attendance-photos')
+                            .upload(path, blob, { contentType: 'image/jpeg' });
+                        if (uploadError) throw uploadError;
+                        const { data: publicUrlData } = supabaseClient.storage.from('attendance-photos').getPublicUrl(path);
+                        if (publicUrlData?.publicUrl) photoUrl = publicUrlData.publicUrl;
+                    } catch (err) {
+                        console.error('Gagal upload foto absensi ke Supabase Storage:', err);
+                    }
+                }
+
+                const record = {
+                    id: 'ATT-' + Date.now(),
+                    employee_id: selectedEmp?.id || 'EMP-UNKNOWN',
+                    employee_name: selectedEmp?.name || 'Staff',
+                    master_photo_ref: selectedEmp?.masterPhoto || '',
+                    captured_photo: photoUrl,
+                    store_name: selectedStore?.name || 'Outlet Seminyak',
+                    shift: selectedShift,
+                    role: selectedEmp?.role || 'Staff',
+                    check_in: attendanceType === 'CHECK_IN' ? nowIso : null,
+                    check_out: attendanceType === 'CHECK_OUT' ? nowIso : null,
+                    attendance_type: attendanceType,
+                    is_late: isLate,
+                    late_minutes: lateMins,
+                    confidence: Number(confidencePct.toFixed(2)),
+                    match_status: 'MATCHED',
+                    // NOTE: this is NOT a real liveness/anti-spoofing check — face-api.js only
+                    // compares face geometry, it cannot tell a live person from a printed photo
+                    // or a phone screen. It's stored here as the same distance-based confidence,
+                    // kept only for backward compatibility with the existing DB column.
+                    liveness_score: Number((confidencePct / 100).toFixed(4)),
+                    device: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Kiosk',
+                    created_at: nowIso
+                };
+
+                if (supabaseClient) {
+                    try {
+                        const { error } = await supabaseClient.from('attendance_records').insert(record);
+                        if (error) throw error;
+                    } catch (err) {
+                        console.error('Gagal menyimpan absensi ke Supabase:', err);
+                        alert('Absensi tercatat di layar ini saja — GAGAL sync ke database. Periksa koneksi internet lalu ulangi absen.');
+                    }
+                }
+
+                setIsVerifying(false);
+                setAttendanceRecords(prev => [record, ...prev]);
+                setVerificationResult(record);
+
+                if (window.confetti) {
+                    window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+                }
             };
 
             const resetKioskFlow = () => {
@@ -398,6 +517,14 @@
                 setHasFilledLateForm(false);
                 setCapturedPhoto(null);
                 setVerificationResult(null);
+                setVerificationError('');
+            };
+
+            const retryCapture = () => {
+                setCapturedPhoto(null);
+                setVerificationError('');
+                setKioskStep(2);
+                startCamera();
             };
 
             const handleAdminLogin = (e) => {
@@ -894,6 +1021,29 @@
                                                         <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                                                         <p className="font-bold text-slate-800 text-sm">Sedang Memproses AI Face Recognition...</p>
                                                     </div>
+                                                ) : verificationError ? (
+                                                    <div className="space-y-4 bg-rose-50 border border-rose-200 p-6 rounded-3xl">
+                                                        <div className="w-16 h-16 bg-rose-600 text-white rounded-full flex items-center justify-center text-3xl mx-auto shadow-lg">
+                                                            ✕
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-extrabold text-rose-900 text-lg">Verifikasi Wajah Gagal</h3>
+                                                            <p className="text-xs text-rose-700 font-medium mt-1">{verificationError}</p>
+                                                        </div>
+
+                                                        <button
+                                                            onClick={retryCapture}
+                                                            className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all"
+                                                        >
+                                                            Coba Lagi
+                                                        </button>
+                                                        <button
+                                                            onClick={resetKioskFlow}
+                                                            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all"
+                                                        >
+                                                            Kembali ke Depan
+                                                        </button>
+                                                    </div>
                                                 ) : verificationResult && (
                                                     <div className="space-y-4 bg-emerald-50 border border-emerald-200 p-6 rounded-3xl">
                                                         <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center text-3xl mx-auto shadow-lg">
@@ -904,6 +1054,9 @@
                                                             <p className="text-xs text-emerald-700 font-medium mt-1">
                                                                 {verificationResult.employee_name} ({verificationResult.store_name})
                                                             </p>
+                                                            <p className="text-[10px] text-emerald-600 mt-1">
+                                                                Kemiripan wajah: {verificationResult.confidence}%
+                                                            </p>
                                                             {verificationResult.is_late && (
                                                                 <span className="inline-block mt-2 bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-300">
                                                                     ⚠️ Terlambat {verificationResult.late_minutes} Menit
@@ -911,7 +1064,7 @@
                                                             )}
                                                         </div>
 
-                                                        <button 
+                                                        <button
                                                             onClick={resetKioskFlow}
                                                             className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all"
                                                         >
