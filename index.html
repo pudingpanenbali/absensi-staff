@@ -420,18 +420,18 @@
                                 <span>📸 Kiosk Absensi AI</span>
                             </button>
 
-                            <button 
-                                onClick={() => setActiveTab('reports')}
-                                className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
-                                    activeTab === 'reports' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-                                }`}
-                            >
-                                <i className="fa-solid fa-chart-line text-base"></i>
-                                <span>📊 Laporan Absensi ({attendanceRecords.length})</span>
-                            </button>
-
                             {isSuperAdmin && (
                                 <>
+                                    <button 
+                                        onClick={() => setActiveTab('reports')}
+                                        className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
+                                            activeTab === 'reports' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-chart-line text-base"></i>
+                                        <span>📊 Laporan Absensi ({attendanceRecords.length})</span>
+                                    </button>
+
                                     <button 
                                         onClick={() => setActiveTab('staff')}
                                         className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
@@ -456,7 +456,7 @@
                         </div>
                     </header>
 
-                    {}
+                    {/* MAIN CONTENT AREA */}
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
                         
                         {/* TAB 1: KIOSK ABSENSI */}
@@ -746,8 +746,8 @@
                             </div>
                         )}
 
-                        {/* TAB 2: LAPORAN ABSENSI */}
-                        {activeTab === 'reports' && (
+                        {/* TAB 2: LAPORAN ABSENSI (SuperAdmin Only) */}
+                        {activeTab === 'reports' && isSuperAdmin && (
                             <div className="space-y-6">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <div>
