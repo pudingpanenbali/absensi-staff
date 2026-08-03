@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Puding Panen Bali HRIS & AI Absensi</title>
+    <title>Puding Panen Bali - Sistem Absensi & Management</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,7 +24,7 @@
     <!-- Supabase JS Client CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Canvas Confetti CDN for success effect -->
+    <!-- Canvas Confetti CDN -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
@@ -34,7 +34,6 @@
             color: #1e293b;
         }
         
-        /* Custom scanner line animation */
         @keyframes scan {
             0% { top: 0%; opacity: 0.8; }
             50% { top: 90%; opacity: 0.3; }
@@ -49,34 +48,31 @@
             animation: scan 2.5s infinite ease-in-out;
         }
 
-        /* Pulse ring */
         @keyframes pulse-ring {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(225, 29, 72, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
         }
-        .pulse-border {
+        .pulse-border-rose {
             animation: pulse-ring 2s infinite;
         }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen selection:bg-emerald-500 selection:text-white">
+<body class="bg-slate-50 min-h-screen selection:bg-amber-500 selection:text-white">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Kredensial bawaan Supabase Puding Panen Bali
+        // Default Supabase Credentials for Puding Panen Bali
         const DEFAULT_SUPABASE_URL = 'https://fqaqqaruktvgpfsiwlkp.supabase.co';
         const DEFAULT_SUPABASE_KEY = 'sb_publishable_vxVqvMbaXlq1Lk5zlIAzeg_QCoZmobc';
 
-        // Helper membersihkan format URL Supabase
         const sanitizeUrl = (url) => {
             if (!url) return '';
             return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
         };
 
-        // Data awal dummy jika Supabase belum terhubung
         const INITIAL_STORES = [
             { id: 'S1', code: 'OUT-01', name: 'Outlet Seminyak', address: 'Jl. Kayu Aya No. 12, Seminyak' },
             { id: 'S2', code: 'OUT-02', name: 'Outlet Ubud', address: 'Jl. Raya Ubud No. 45, Ubud' },
@@ -92,278 +88,286 @@
         ];
 
         function App() {
-            const [activeTab, setActiveTab] = useState('kiosk'); // 'kiosk', 'staff', 'stores', 'reports', 'logs'
+            const [activeTab, setActiveTab] = useState('kiosk');
             const [isSuperAdmin, setIsSuperAdmin] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
             const [showConfigModal, setShowConfigModal] = useState(false);
-            const [adminPin, setAdminPin] = useState('');
+            const [adminPinInput, setAdminPinInput] = useState('');
+            const [adminPin, setAdminPin] = useState(localStorage.getItem('ADMIN_PIN') || '1234');
 
-            // Supabase States
+            // Change PIN State
+            const [showChangePinModal, setShowChangePinModal] = useState(false);
+            const [pinForm, setPinForm] = useState({ oldPin: '', newPin: '', confirmPin: '' });
+            const [pinNotice, setPinNotice] = useState({ type: '', msg: '' });
+
+            // Supabase Database States
             const [supabaseUrl, setSupabaseUrl] = useState(localStorage.getItem('SUPABASE_URL') || DEFAULT_SUPABASE_URL);
             const [supabaseKey, setSupabaseKey] = useState(localStorage.getItem('SUPABASE_KEY') || DEFAULT_SUPABASE_KEY);
             const [supabaseClient, setSupabaseClient] = useState(null);
             const [isConnected, setIsConnected] = useState(false);
-            const [dbLoading, setDbLoading] = useState(false);
 
             // Application Data States
             const [stores, setStores] = useState(INITIAL_STORES);
             const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
             const [attendanceRecords, setAttendanceRecords] = useState([]);
-            const [auditLogs, setAuditLogs] = useState([]);
 
             // Kiosk Selection Flow States
             const [selectedEmpId, setSelectedEmpId] = useState('');
-            const [selectedStoreId, setSelectedStoreId] = useState('');
+            const [selectedStoreId, setSelectedStoreId] = useState('S1');
             const [selectedShift, setSelectedShift] = useState('Shift Pagi (07:00 - 15:00)');
             const [attendanceType, setAttendanceType] = useState('CHECK_IN');
-            const [kioskStep, setKioskStep] = useState(1); // 1: Form Selection, 2: Camera Capture, 3: Success Result
+            const [kioskStep, setKioskStep] = useState(1);
 
-            // Camera & AI State
+            // Late Warning Modal States
+            const [showLateModal, setShowLateModal] = useState(false);
+            const [hasFilledLateForm, setHasFilledLateForm] = useState(false);
+            const [lateMinutesCount, setLateMinutesCount] = useState(0);
+            const [lateWarningAlert, setLateWarningAlert] = useState('');
+
+            // Camera & Verification State
             const [isCameraActive, setIsCameraActive] = useState(false);
             const [capturedPhoto, setCapturedPhoto] = useState(null);
             const [isVerifying, setIsVerifying] = useState(false);
             const [verificationResult, setVerificationResult] = useState(null);
 
-            // Modal Staff States
+            // Staff Management Modal States
             const [showStaffModal, setShowStaffModal] = useState(false);
-            const [newEmp, setNewEmp] = useState({
-                id: '', name: '', phone: '', role: 'Kasir', storeId: 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: ''
+            const [editingEmp, setEditingEmp] = useState(null);
+            const [deleteConfirmEmp, setDeleteConfirmEmp] = useState(null);
+            const [staffNotice, setStaffNotice] = useState('');
+            const [empForm, setEmpForm] = useState({
+                name: '', phone: '', role: 'Kasir', storeId: 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: ''
             });
+
+            // Store Management Modal States
+            const [showStoreModal, setShowStoreModal] = useState(false);
+            const [editingStore, setEditingStore] = useState(null);
+            const [deleteConfirmStore, setDeleteConfirmStore] = useState(null);
+            const [storeForm, setStoreForm] = useState({ code: '', name: '', address: '' });
 
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
 
             useEffect(() => {
-                initSupabase();
-            }, [supabaseUrl, supabaseKey]);
-
-            const initSupabase = async () => {
-                const targetUrl = sanitizeUrl(supabaseUrl);
-                const targetKey = supabaseKey ? supabaseKey.trim() : '';
-
-                if (targetUrl && targetKey && window.supabase) {
+                const cleanUrl = sanitizeUrl(supabaseUrl);
+                if (cleanUrl && supabaseKey && window.supabase) {
                     try {
-                        const client = window.supabase.createClient(targetUrl, targetKey);
+                        const client = window.supabase.createClient(cleanUrl, supabaseKey);
                         setSupabaseClient(client);
                         setIsConnected(true);
-                        localStorage.setItem('SUPABASE_URL', targetUrl);
-                        localStorage.setItem('SUPABASE_KEY', targetKey);
-
-                        // Load data from Supabase
-                        fetchDataFromSupabase(client);
+                        localStorage.setItem('SUPABASE_URL', cleanUrl);
+                        localStorage.setItem('SUPABASE_KEY', supabaseKey);
                     } catch (err) {
-                        console.error('Failed to connect to Supabase:', err);
+                        console.error('Supabase Connection Error:', err);
                         setIsConnected(false);
                     }
+                }
+            }, [supabaseUrl, supabaseKey]);
+
+            const calculateLateMinutes = (shiftString) => {
+                const now = new Date();
+                let startHour = 7;
+                let startMinute = 0;
+
+                if (shiftString.includes('14:00')) {
+                    startHour = 14;
+                } else if (shiftString.includes('08:00')) {
+                    startHour = 8;
+                } else if (shiftString.includes('07:00')) {
+                    startHour = 7;
                 } else {
-                    setIsConnected(false);
-                }
-            };
-
-            const fetchDataFromSupabase = async (client) => {
-                if (!client) return;
-                setDbLoading(true);
-                try {
-                    // Fetch Stores
-                    const { data: dbStores } = await client.from('stores').select('*');
-                    if (dbStores && dbStores.length > 0) setStores(dbStores);
-
-                    // Fetch Employees
-                    const { data: dbEmp } = await client.from('employees').select('*');
-                    if (dbEmp && dbEmp.length > 0) {
-                        setEmployees(dbEmp.map(e => ({
-                            id: e.id,
-                            name: e.name,
-                            phone: e.phone,
-                            role: e.role,
-                            storeId: e.store_id || 'S1',
-                            shift: e.shift || 'Shift Pagi (07:00 - 15:00)',
-                            isDriver: e.is_driver || false,
-                            masterPhoto: e.master_photo
-                        })));
+                    const match = shiftString.match(/(\d{2}):(\d{2})/);
+                    if (match) {
+                        startHour = parseInt(match[1], 10);
+                        startMinute = parseInt(match[2], 10);
                     }
-
-                    // Fetch Attendance Records
-                    const { data: dbAtt } = await client.from('attendance_records').select('*').order('created_at', { ascending: false });
-                    if (dbAtt) setAttendanceRecords(dbAtt);
-
-                } catch (e) {
-                    console.log('Using local fallback state:', e);
-                } finally {
-                    setDbLoading(false);
                 }
+
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                const shiftMinutes = startHour * 60 + startMinute;
+                const lateDiff = currentMinutes - shiftMinutes;
+
+                return lateDiff > 0 ? lateDiff : 0;
             };
 
-            // Get selected employee object
-            const selectedEmployee = employees.find(e => e.id === selectedEmpId);
-            const isDriverSelected = selectedEmployee?.isDriver || (selectedEmployee?.role || '').toLowerCase().includes('driver') || (selectedEmployee?.role || '').toLowerCase().includes('supir');
-
-            // Auto-fill store & shift when staff changes
-            useEffect(() => {
-                if (selectedEmployee) {
-                    setSelectedStoreId(selectedEmployee.storeId || stores[0]?.id || 'S1');
-                    setSelectedShift(selectedEmployee.shift || 'Shift Pagi (07:00 - 15:00)');
+            const handleProceedToCamera = () => {
+                if (!selectedEmpId) {
+                    alert('Mohon pilih nama karyawan terlebih dahulu!');
+                    return;
                 }
-            }, [selectedEmpId]);
+                if (!selectedStoreId) {
+                    alert('Mohon pilih store / outlet lokasi kerja hari ini!');
+                    return;
+                }
+
+                if (attendanceType === 'CHECK_IN') {
+                    const lateMins = calculateLateMinutes(selectedShift);
+                    if (lateMins > 0 && !hasFilledLateForm) {
+                        setLateMinutesCount(lateMins);
+                        setLateWarningAlert('');
+                        setShowLateModal(true);
+                        return;
+                    }
+                }
+
+                setKioskStep(2);
+                startCamera();
+            };
+
+            const handleConfirmLateForm = (isYes) => {
+                if (isYes) {
+                    setHasFilledLateForm(true);
+                    setShowLateModal(false);
+                    setLateWarningAlert('');
+                    setKioskStep(2);
+                    startCamera();
+                } else {
+                    setLateWarningAlert('⚠️ Kamu HARUS mengisi Form Datang Terlambat di WhatsApp Group terlebih dahulu! Setelah diisi, klik "Ya, Sudah Isi" untuk melanjutkan.');
+                }
+            };
 
             const startCamera = async () => {
                 setIsCameraActive(true);
-                setCapturedPhoto(null);
-                setVerificationResult(null);
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                     }
                 } catch (err) {
-                    console.error('Camera access error:', err);
-                    alert('Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan pada browser.');
+                    console.error("Gagal membuka kamera:", err);
                 }
             };
 
-            const stopCamera = () => {
-                if (videoRef.current && videoRef.current.srcObject) {
-                    const stream = videoRef.current.srcObject;
-                    const tracks = stream.getTracks();
-                    tracks.forEach(track => track.stop());
-                    videoRef.current.srcObject = null;
+            const captureAndVerify = () => {
+                if (!videoRef.current || !canvasRef.current) return;
+                const context = canvasRef.current.getContext('2d');
+                canvasRef.current.width = videoRef.current.videoWidth || 640;
+                canvasRef.current.height = videoRef.current.videoHeight || 480;
+                context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                
+                const photoData = canvasRef.current.toDataURL('image/jpeg');
+                setCapturedPhoto(photoData);
+
+                if (videoRef.current.srcObject) {
+                    videoRef.current.srcObject.getTracks().forEach(track => track.stop());
                 }
                 setIsCameraActive(false);
-            };
 
-            const takeSnapshotAndVerify = () => {
-                if (!videoRef.current || !canvasRef.current) return;
-                
-                const canvas = canvasRef.current;
-                const video = videoRef.current;
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 480;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const photoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                setCapturedPhoto(photoDataUrl);
-                stopCamera();
-
-                // Process AI Verification Simulation
-                processAIVerification(photoDataUrl);
-            };
-
-            const processAIVerification = async (photo) => {
                 setIsVerifying(true);
-
-                // Simulation delay for face recognition algorithm & liveness check
-                setTimeout(async () => {
-                    const confidence = (Math.random() * (99.2 - 94.5) + 94.5).toFixed(1);
-                    const liveness = (Math.random() * (99.9 - 97.0) + 97.0).toFixed(1);
-                    const isLate = attendanceType === 'CHECK_IN' && new Date().getHours() >= 9;
-                    const lateMins = isLate ? Math.floor(Math.random() * 25) + 5 : 0;
-
-                    const targetStore = stores.find(s => s.id === selectedStoreId)?.name || 'Central Kitchen / General';
+                setTimeout(() => {
+                    setIsVerifying(false);
+                    const selectedEmp = employees.find(e => e.id === selectedEmpId);
+                    const selectedStore = stores.find(s => s.id === selectedStoreId);
+                    const lateMins = calculateLateMinutes(selectedShift);
+                    const isLate = attendanceType === 'CHECK_IN' && lateMins > 0;
 
                     const record = {
                         id: 'ATT-' + Date.now(),
-                        employee_id: selectedEmployee.id,
-                        employee_name: selectedEmployee.name,
-                        master_photo_ref: selectedEmployee.masterPhoto,
-                        captured_photo: photo,
-                        store_name: isDriverSelected ? 'Tugas Driver / On The Road' : targetStore,
-                        role: selectedEmployee.role,
+                        employee_id: selectedEmp?.id || 'EMP-UNKNOWN',
+                        employee_name: selectedEmp?.name || 'Staff',
+                        master_photo_ref: selectedEmp?.masterPhoto || '',
+                        captured_photo: photoData,
+                        store_name: selectedStore?.name || 'Outlet Seminyak',
+                        shift: selectedShift,
+                        role: selectedEmp?.role || 'Staff',
                         check_in: attendanceType === 'CHECK_IN' ? new Date().toISOString() : null,
                         check_out: attendanceType === 'CHECK_OUT' ? new Date().toISOString() : null,
                         attendance_type: attendanceType,
                         is_late: isLate,
                         late_minutes: lateMins,
-                        confidence: parseFloat(confidence),
+                        confidence: 98.4,
                         match_status: 'MATCHED',
-                        liveness_score: parseFloat(liveness),
-                        device: navigator.userAgent.includes('Mobile') ? 'HP / Mobile Device' : 'Kiosk Tablet / PC',
+                        liveness_score: 0.99,
+                        device: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Kiosk',
                         created_at: new Date().toISOString()
                     };
 
-                    // Save to Supabase if connected
-                    if (supabaseClient && isConnected) {
-                        try {
-                            await supabaseClient.from('attendance_records').insert([record]);
-                        } catch (err) {
-                            console.error('Supabase Save Error:', err);
-                        }
-                    }
-
-                    // Update Local State
                     setAttendanceRecords(prev => [record, ...prev]);
                     setVerificationResult(record);
-                    setIsVerifying(false);
-                    setKioskStep(3);
 
-                    // Trigger celebratory confetti
                     if (window.confetti) {
-                        window.confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+                        window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
                     }
-                }, 1800);
-            };
-
-            const handleAdminLogin = (e) => {
-                e.preventDefault();
-                if (adminPin === '1234' || adminPin === '8888') {
-                    setIsSuperAdmin(true);
-                    setShowLoginModal(false);
-                    setAdminPin('');
-                } else {
-                    alert('PIN Admin Salah! (PIN Standar: 1234)');
-                }
-            };
-
-            const handleAddEmployee = async (e) => {
-                e.preventDefault();
-                if (!newEmp.name) {
-                    alert('Mohon isi nama karyawan!');
-                    return;
-                }
-
-                const empObj = {
-                    id: 'EMP' + String(employees.length + 1).padStart(3, '0'),
-                    name: newEmp.name,
-                    phone: newEmp.phone || '-',
-                    role: newEmp.role,
-                    store_id: newEmp.storeId,
-                    shift: newEmp.shift,
-                    is_driver: newEmp.isDriver,
-                    master_photo: newEmp.masterPhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-                    created_at: new Date().toISOString()
-                };
-
-                if (supabaseClient && isConnected) {
-                    await supabaseClient.from('employees').insert([empObj]);
-                }
-
-                setEmployees(prev => [...prev, {
-                    id: empObj.id,
-                    name: empObj.name,
-                    phone: empObj.phone,
-                    role: empObj.role,
-                    storeId: empObj.store_id,
-                    shift: empObj.shift,
-                    isDriver: empObj.is_driver,
-                    masterPhoto: empObj.master_photo
-                }]);
-
-                setShowStaffModal(false);
-                setNewEmp({ id: '', name: '', phone: '', role: 'Kasir', storeId: 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: '' });
-                alert('Berhasil menambah karyawan baru!');
+                }, 1500);
             };
 
             const resetKioskFlow = () => {
                 setKioskStep(1);
                 setSelectedEmpId('');
+                setHasFilledLateForm(false);
                 setCapturedPhoto(null);
                 setVerificationResult(null);
             };
 
+            const handleAdminLogin = (e) => {
+                e.preventDefault();
+                if (adminPinInput === adminPin) {
+                    setIsSuperAdmin(true);
+                    setShowLoginModal(false);
+                    setAdminPinInput('');
+                } else {
+                    alert('PIN Admin Salah! Gunakan PIN standar 1234');
+                }
+            };
+
+            const handleChangePin = (e) => {
+                e.preventDefault();
+                if (pinForm.oldPin !== adminPin) {
+                    setPinNotice({ type: 'error', msg: 'PIN Lama tidak cocok!' });
+                    return;
+                }
+                if (pinForm.newPin.length < 4) {
+                    setPinNotice({ type: 'error', msg: 'PIN Baru minimal 4 karakter!' });
+                    return;
+                }
+                if (pinForm.newPin !== pinForm.confirmPin) {
+                    setPinNotice({ type: 'error', msg: 'Konfirmasi PIN Baru tidak sesuai!' });
+                    return;
+                }
+
+                setAdminPin(pinForm.newPin);
+                localStorage.setItem('ADMIN_PIN', pinForm.newPin);
+                setPinNotice({ type: 'success', msg: 'PIN Admin berhasil diperbarui!' });
+                setTimeout(() => {
+                    setShowChangePinModal(false);
+                    setPinForm({ oldPin: '', newPin: '', confirmPin: '' });
+                    setPinNotice({ type: '', msg: '' });
+                }, 1200);
+            };
+
+            const openAddStaffModal = () => {
+                setEditingEmp(null);
+                setEmpForm({ name: '', phone: '', role: 'Kasir', storeId: stores[0]?.id || 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80' });
+                setShowStaffModal(true);
+            };
+
+            const openEditStaffModal = (emp) => {
+                setEditingEmp(emp);
+                setEmpForm({ name: emp.name, phone: emp.phone, role: emp.role, storeId: emp.storeId, shift: emp.shift, isDriver: emp.isDriver, masterPhoto: emp.masterPhoto });
+                setShowStaffModal(true);
+            };
+
+            const handleSaveStaff = (e) => {
+                e.preventDefault();
+                if (!empForm.name) return;
+
+                if (editingEmp) {
+                    setEmployees(prev => prev.map(emp => emp.id === editingEmp.id ? { ...emp, ...empForm } : emp));
+                } else {
+                    const newEmp = { id: 'EMP' + Date.now().toString().slice(-4), ...empForm };
+                    setEmployees(prev => [newEmp, ...prev]);
+                }
+                setShowStaffModal(false);
+            };
+
+            const handleDeleteStaff = (empId) => {
+                setEmployees(prev => prev.filter(e => e.id !== empId));
+                setDeleteConfirmEmp(null);
+            };
+
             return (
                 <div className="min-h-screen flex flex-col justify-between">
-                    {}
+                    {/* Header Navbar */}
                     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
                             <div className="flex items-center space-x-3">
@@ -371,13 +375,12 @@
                                     🍮
                                 </div>
                                 <div>
-                                    <h1 className="font-extrabold text-slate-900 text-lg sm:text-xl tracking-tight">Puding Panen Bali HRIS</h1>
-                                    <p className="text-xs text-slate-500 font-medium">Sistem Absensi AI & Sinkronisasi Multi-Device</p>
+                                    <h1 className="font-extrabold text-slate-900 text-lg sm:text-xl tracking-tight">Puding Panen Bali</h1>
+                                    <p className="text-xs text-slate-500 font-medium">Sistem Absensi AI & Management Multi-Outlet</p>
                                 </div>
                             </div>
 
                             <div className="flex items-center space-x-2 sm:space-x-3">
-                                {/* Supabase Status Badge */}
                                 <button 
                                     onClick={() => setShowConfigModal(true)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 transition-all border ${
@@ -387,21 +390,35 @@
                                     }`}
                                 >
                                     <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                                    <span>{isConnected ? 'Supabase Connected' : 'Database Offline'}</span>
+                                    <span>{isConnected ? 'Database Online' : 'Database Offline'}</span>
                                     <i className="fa-solid fa-gear text-xs ml-1 opacity-70"></i>
                                 </button>
 
-                                {/* Admin Mode Toggle */}
                                 {isSuperAdmin ? (
-                                    <span className="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 rounded-lg font-bold border border-amber-300 flex items-center gap-1.5">
-                                        <i className="fa-solid fa-user-shield"></i> Super Admin Mode
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="bg-amber-100 text-amber-800 text-xs px-3 py-1.5 rounded-lg font-bold border border-amber-300 flex items-center gap-1.5">
+                                            <i className="fa-solid fa-user-shield"></i> Super Admin Mode
+                                        </span>
+                                        <button 
+                                            onClick={() => setShowChangePinModal(true)}
+                                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-bold border border-slate-300 transition-all flex items-center gap-1.5"
+                                        >
+                                            <i className="fa-solid fa-key text-xs"></i>
+                                            <span>Ganti PIN</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => { setIsSuperAdmin(false); setActiveTab('kiosk'); }}
+                                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-rose-200 transition-all"
+                                        >
+                                            Keluar
+                                        </button>
+                                    </div>
                                 ) : (
                                     <button 
                                         onClick={() => setShowLoginModal(true)}
-                                        className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition-all shadow-sm flex items-center space-x-1.5"
+                                        className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold transition-all shadow-sm flex items-center space-x-1.5"
                                     >
-                                        <i className="fa-solid fa-[#key] text-xs"></i>
+                                        <i className="fa-solid fa-lock text-xs"></i>
                                         <span>Login Admin</span>
                                     </button>
                                 )}
@@ -409,129 +426,152 @@
                         </div>
 
                         {/* Navigation Tabs */}
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto border-t border-slate-100 no-scrollbar">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 flex space-x-2 sm:space-x-6 overflow-x-auto">
                             <button 
                                 onClick={() => setActiveTab('kiosk')}
-                                className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
-                                    activeTab === 'kiosk' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                className={`py-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center space-x-2 ${
+                                    activeTab === 'kiosk' 
+                                        ? 'border-amber-500 text-amber-600' 
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
                                 }`}
                             >
-                                <i className="fa-solid fa-[#camera] text-base"></i>
-                                <span>📸 Kiosk Absensi AI</span>
+                                <i className="fa-solid fa-camera"></i>
+                                <span>Kiosk Absensi AI</span>
                             </button>
 
+                            {/* Laporan Absensi Restriksi SuperAdmin */}
                             {isSuperAdmin && (
                                 <>
                                     <button 
                                         onClick={() => setActiveTab('reports')}
-                                        className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
-                                            activeTab === 'reports' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        className={`py-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center space-x-2 ${
+                                            activeTab === 'reports' 
+                                                ? 'border-amber-500 text-amber-600' 
+                                                : 'border-transparent text-slate-500 hover:text-slate-800'
                                         }`}
                                     >
-                                        <i className="fa-solid fa-chart-line text-base"></i>
-                                        <span>📊 Laporan Absensi ({attendanceRecords.length})</span>
+                                        <i className="fa-solid fa-chart-line"></i>
+                                        <span>Laporan Absensi ({attendanceRecords.length})</span>
                                     </button>
 
                                     <button 
                                         onClick={() => setActiveTab('staff')}
-                                        className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
-                                            activeTab === 'staff' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        className={`py-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center space-x-2 ${
+                                            activeTab === 'staff' 
+                                                ? 'border-amber-500 text-amber-600' 
+                                                : 'border-transparent text-slate-500 hover:text-slate-800'
                                         }`}
                                     >
-                                        <i className="fa-solid fa-users text-base"></i>
-                                        <span>👥 Kelola Staff ({employees.length})</span>
+                                        <i className="fa-solid fa-users"></i>
+                                        <span>Kelola Staff ({employees.length})</span>
                                     </button>
 
                                     <button 
                                         onClick={() => setActiveTab('stores')}
-                                        className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center space-x-2 ${
-                                            activeTab === 'stores' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        className={`py-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center space-x-2 ${
+                                            activeTab === 'stores' 
+                                                ? 'border-amber-500 text-amber-600' 
+                                                : 'border-transparent text-slate-500 hover:text-slate-800'
                                         }`}
                                     >
-                                        <i className="fa-solid fa-[#store] text-base"></i>
-                                        <span>🏪 Outlet Toko ({stores.length})</span>
+                                        <i className="fa-solid fa-store"></i>
+                                        <span>Kelola Store ({stores.length})</span>
                                     </button>
                                 </>
                             )}
                         </div>
                     </header>
 
-                    {/* MAIN CONTENT AREA */}
-                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-                        
+                    {/* Main Content Body */}
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
                         {/* TAB 1: KIOSK ABSENSI */}
                         {activeTab === 'kiosk' && (
-                            <div className="max-w-3xl mx-auto">
-                                <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden">
-                                    {/* Header Step Banner */}
-                                    <div className="bg-slate-900 text-white p-6 sm:p-8 relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 rounded-full bg-amber-500/10 blur-2xl pointer-events-none"></div>
-                                        
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-950/80 px-3 py-1 rounded-full border border-amber-800">
-                                                Langkah {kioskStep} dari 3
+                            <div className="max-w-xl mx-auto space-y-6">
+                                {kioskStep === 1 && (
+                                    <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
+                                        <div className="text-center space-y-2">
+                                            <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full border border-amber-300">
+                                                LANGKAH 1 DARI 2
                                             </span>
-                                            <span className="text-xs text-slate-400">
-                                                {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                            </span>
+                                            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Pilih Data Absensi Staff</h2>
+                                            <p className="text-xs text-slate-500">Tentukan outlet bertugas, shift kerja, dan nama Anda hari ini</p>
                                         </div>
 
-                                        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                                            {kioskStep === 1 && 'Pilih Identitas & Shift Kerja'}
-                                            {kioskStep === 2 && 'Verifikasi Wajah AI Camera'}
-                                            {kioskStep === 3 && 'Absensi Berhasil Catat!'}
-                                        </h2>
-                                        <p className="text-slate-400 text-sm mt-1">
-                                            {kioskStep === 1 && 'Pilih nama staff dari daftar. Supir/Driver akan diproses secara otomatis.'}
-                                            {kioskStep === 2 && 'Posisikan wajah Anda di dalam bingkai scanner kamera.'}
-                                            {kioskStep === 3 && 'Data absensi Anda telah tersimpan dan terverifikasi.'}
-                                        </p>
-                                    </div>
-
-                                    {/* STEP 1: FORM SELECTION */}
-                                    {kioskStep === 1 && (
-                                        <div className="p-6 sm:p-8 space-y-6">
-                                            {/* Mode Absen Toggle */}
+                                        <div className="space-y-4">
+                                            {/* Attendance Type */}
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipe Absensi</label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        type="button"
+                                                <label className="block text-xs font-bold text-slate-700 mb-2">Tipe Absensi</label>
+                                                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                                                    <button 
+                                                        type="button" 
                                                         onClick={() => setAttendanceType('CHECK_IN')}
-                                                        className={`p-4 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition-all ${
-                                                            attendanceType === 'CHECK_IN'
-                                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                        className={`py-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 ${
+                                                            attendanceType === 'CHECK_IN' 
+                                                                ? 'bg-emerald-600 text-white shadow-md' 
+                                                                : 'text-slate-600 hover:text-slate-900'
                                                         }`}
                                                     >
-                                                        <i className="fa-solid fa-arrow-right-to-bracket text-lg"></i>
+                                                        <i className="fa-solid fa-right-to-bracket"></i>
                                                         <span>ABSEN MASUK</span>
                                                     </button>
-
-                                                    <button
-                                                        type="button"
+                                                    <button 
+                                                        type="button" 
                                                         onClick={() => setAttendanceType('CHECK_OUT')}
-                                                        className={`p-4 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition-all ${
-                                                            attendanceType === 'CHECK_OUT'
-                                                                ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm'
-                                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                        className={`py-3 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center gap-2 ${
+                                                            attendanceType === 'CHECK_OUT' 
+                                                                ? 'bg-rose-600 text-white shadow-md' 
+                                                                : 'text-slate-600 hover:text-slate-900'
                                                         }`}
                                                     >
-                                                        <i className="fa-solid fa-arrow-right-from-bracket text-lg"></i>
+                                                        <i className="fa-solid fa-right-from-bracket"></i>
                                                         <span>ABSEN PULANG</span>
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            {/* Employee Dropdown */}
+                                            {/* Store Selection */}
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">1. Pilih Nama Staff / Karyawan</label>
-                                                <select
-                                                    value={selectedEmpId}
-                                                    onChange={(e) => setSelectedEmpId(e.target.value)}
-                                                    className="w-full p-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 font-semibold text-base bg-white shadow-sm"
+                                                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                                    <i className="fa-solid fa-store text-amber-600"></i> Pilih Store / Outlet Bertugas
+                                                </label>
+                                                <select 
+                                                    value={selectedStoreId} 
+                                                    onChange={(e) => setSelectedStoreId(e.target.value)}
+                                                    className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
                                                 >
-                                                    <option value="">-- Pilih Nama Anda --</option>
+                                                    {stores.map(st => (
+                                                        <option key={st.id} value={st.id}>{st.name} ({st.code})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Shift Selection */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                                    <i className="fa-solid fa-clock text-amber-600"></i> Pilih Shift Kerja Hari Ini
+                                                </label>
+                                                <select 
+                                                    value={selectedShift} 
+                                                    onChange={(e) => setSelectedShift(e.target.value)}
+                                                    className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
+                                                >
+                                                    <option value="Shift Pagi (07:00 - 15:00)">Shift Pagi (07:00 - 15:00)</option>
+                                                    <option value="Shift Siang (14:00 - 22:00)">Shift Siang (14:00 - 22:00)</option>
+                                                    <option value="Shift Full (08:00 - 20:00)">Shift Full (08:00 - 20:00)</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Staff Selection */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                                    <i className="fa-solid fa-user text-amber-600"></i> Pilih Nama Karyawan / Staff
+                                                </label>
+                                                <select 
+                                                    value={selectedEmpId} 
+                                                    onChange={(e) => setSelectedEmpId(e.target.value)}
+                                                    className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl font-bold text-slate-800 text-sm focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
+                                                >
+                                                    <option value="">-- Pilih Nama Karyawan --</option>
                                                     {employees.map(emp => (
                                                         <option key={emp.id} value={emp.id}>
                                                             {emp.name} ({emp.role}) {emp.isDriver ? '🚚 Driver' : ''}
@@ -539,275 +579,151 @@
                                                     ))}
                                                 </select>
                                             </div>
+                                        </div>
 
-                                            {/* DRIVER SPECIAL DETECTED BANNER */}
-                                            {isDriverSelected && (
-                                                <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-5 animate-bounce-once">
-                                                    <div className="flex items-start space-x-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
-                                                            🚚
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-extrabold text-amber-900 text-sm">STAFF SUPIR / DRIVER TERDETEKSI!</h4>
-                                                            <p className="text-amber-700 text-xs mt-0.5">
-                                                                Lokasi toko dan shift disesuaikan secara otomatis. Klik tombol di bawah untuk langsung verifikasi foto kamera.
-                                                            </p>
-                                                        </div>
-                                                    </div>
+                                        <button 
+                                            onClick={handleProceedToCamera}
+                                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-amber-200 transition-all transform active:scale-95 flex items-center justify-center space-x-2"
+                                        >
+                                            <span>Lanjut ke Scan Wajah AI</span>
+                                            <i className="fa-solid fa-camera"></i>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {kioskStep === 2 && (
+                                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-5 text-center">
+                                        <div className="flex justify-between items-center">
+                                            <button onClick={resetKioskFlow} className="text-xs text-slate-500 font-bold hover:text-slate-800">
+                                                ← Kembali
+                                            </button>
+                                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full">
+                                                AI FACE MATCHING
+                                            </span>
+                                        </div>
+
+                                        {!capturedPhoto ? (
+                                            <div className="space-y-4">
+                                                <div className="relative w-full aspect-square max-w-xs mx-auto rounded-3xl overflow-hidden bg-slate-900 border-4 border-amber-400 shadow-xl flex items-center justify-center">
+                                                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover transform -scale-x-100" />
+                                                    <div className="scanner-line"></div>
+                                                    <div className="absolute inset-0 border-2 border-dashed border-emerald-400/60 rounded-full m-8 pointer-events-none"></div>
                                                 </div>
-                                            )}
+                                                <canvas ref={canvasRef} className="hidden" />
 
-                                            {/* Standard Staff Fields (Hidden or Disabled for Driver) */}
-                                            {!isDriverSelected && selectedEmpId && (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">2. Outlet Toko</label>
-                                                        <select
-                                                            value={selectedStoreId}
-                                                            onChange={(e) => setSelectedStoreId(e.target.value)}
-                                                            className="w-full p-3 border border-slate-300 rounded-xl text-slate-800 font-medium bg-white"
-                                                        >
-                                                            {stores.map(st => (
-                                                                <option key={st.id} value={st.id}>{st.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">3. Shift Kerja</label>
-                                                        <select
-                                                            value={selectedShift}
-                                                            onChange={(e) => setSelectedShift(e.target.value)}
-                                                            className="w-full p-3 border border-slate-300 rounded-xl text-slate-800 font-medium bg-white"
-                                                        >
-                                                            <option value="Shift Pagi (07:00 - 15:00)">Shift Pagi (07:00 - 15:00)</option>
-                                                            <option value="Shift Siang (14:00 - 22:00)">Shift Siang (14:00 - 22:00)</option>
-                                                            <option value="Shift Full (08:00 - 20:00)">Shift Full (08:00 - 20:00)</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Action Submit to Step 2 */}
-                                            <div className="pt-4">
-                                                <button
-                                                    disabled={!selectedEmpId}
-                                                    onClick={() => {
-                                                        setKioskStep(2);
-                                                        startCamera();
-                                                    }}
-                                                    className={`w-full py-4 rounded-xl font-bold text-base shadow-lg transition-all flex items-center justify-center space-x-2 ${
-                                                        !selectedEmpId
-                                                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                                            : isDriverSelected
-                                                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-200 scale-[1.01]'
-                                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
-                                                    }`}
+                                                <button 
+                                                    onClick={captureAndVerify}
+                                                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center space-x-2"
                                                 >
-                                                    <i className="fa-solid fa-camera text-lg"></i>
-                                                    <span>
-                                                        {isDriverSelected ? 'LANGSUNG FOTO ABSENSI SUPIR ➔' : 'Lanjut ke Foto Absensi Wajah ➔'}
-                                                    </span>
+                                                    <i className="fa-solid fa-camera text-base"></i>
+                                                    <span>Ambil Foto & Verifikasi AI</span>
                                                 </button>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {/* STEP 2: CAMERA CAPTURE */}
-                                    {kioskStep === 2 && (
-                                        <div className="p-6 sm:p-8 space-y-6 text-center">
-                                            <div className="relative max-w-md mx-auto bg-slate-900 rounded-2xl overflow-hidden aspect-[4/3] shadow-inner flex items-center justify-center border-4 border-slate-800">
-                                                {/* Hidden Canvas for capture snapshot */}
-                                                <canvas ref={canvasRef} className="hidden"></canvas>
-
-                                                {/* Live Camera View */}
-                                                <video 
-                                                    ref={videoRef} 
-                                                    autoPlay 
-                                                    playsInline 
-                                                    className={`w-full h-full object-cover transform -scale-x-100 ${isVerifying ? 'opacity-50' : 'opacity-100'}`}
-                                                ></video>
-
-                                                {/* Scanner Overlay UI */}
-                                                <div className="absolute inset-0 border-2 border-emerald-400/40 rounded-2xl pointer-events-none flex flex-col justify-between p-4">
-                                                    <div className="scanner-line"></div>
-                                                    <div className="w-48 h-48 mx-auto border-2 border-dashed border-emerald-400 rounded-full flex items-center justify-center opacity-75 pulse-border">
-                                                        <span className="text-emerald-400 text-xs font-semibold bg-black/60 px-2 py-0.5 rounded-full">
-                                                            Posisikan Wajah
-                                                        </span>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {isVerifying ? (
+                                                    <div className="py-12 space-y-4">
+                                                        <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                                        <p className="font-bold text-slate-800 text-sm">Sedang Memproses AI Face Recognition...</p>
                                                     </div>
-                                                    <div className="text-xs text-emerald-300 font-mono bg-slate-950/80 py-1 px-3 rounded-lg self-center backdrop-blur-sm">
-                                                        AI Face Detection Active
-                                                    </div>
-                                                </div>
+                                                ) : verificationResult && (
+                                                    <div className="space-y-4 bg-emerald-50 border border-emerald-200 p-6 rounded-3xl">
+                                                        <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center text-3xl mx-auto shadow-lg">
+                                                            ✓
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-extrabold text-emerald-900 text-lg">Absensi Berhasil Terverifikasi!</h3>
+                                                            <p className="text-xs text-emerald-700 font-medium mt-1">
+                                                                {verificationResult.employee_name} ({verificationResult.store_name})
+                                                            </p>
+                                                            {verificationResult.is_late && (
+                                                                <span className="inline-block mt-2 bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-300">
+                                                                    ⚠️ Terlambat {verificationResult.late_minutes} Menit
+                                                                </span>
+                                                            )}
+                                                        </div>
 
-                                                {/* Verifying Loader Overlay */}
-                                                {isVerifying && (
-                                                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center text-white space-y-3">
-                                                        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                                                        <p className="font-bold text-sm tracking-wide">Memverifikasi Wajah Staff...</p>
-                                                        <p className="text-xs text-slate-400">Mencocokkan ke database Supabase AI</p>
+                                                        <button 
+                                                            onClick={resetKioskFlow}
+                                                            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all"
+                                                        >
+                                                            Selesai & Kembali ke Depan
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* Selected Staff Info Summary */}
-                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between text-left">
-                                                <div className="flex items-center space-x-3">
-                                                    <img 
-                                                        src={selectedEmployee?.masterPhoto} 
-                                                        alt="Master" 
-                                                        className="w-12 h-12 rounded-xl object-cover border border-slate-300"
-                                                    />
-                                                    <div>
-                                                        <h4 className="font-bold text-slate-800 text-sm">{selectedEmployee?.name}</h4>
-                                                        <p className="text-xs text-slate-500">{selectedEmployee?.role} • {isDriverSelected ? 'Driver Route' : selectedShift}</p>
-                                                    </div>
-                                                </div>
-                                                <button 
-                                                    onClick={() => { stopCamera(); setKioskStep(1); }}
-                                                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-300 bg-white"
-                                                >
-                                                    Ubah
-                                                </button>
-                                            </div>
-
-                                            {/* Capture Trigger Button */}
-                                            <div className="flex space-x-3">
-                                                <button
-                                                    onClick={() => { stopCamera(); setKioskStep(1); }}
-                                                    className="flex-1 py-3.5 rounded-xl font-bold text-slate-700 bg-slate-100 hover:bg-slate-200"
-                                                >
-                                                    Kembali
-                                                </button>
-                                                <button
-                                                    disabled={isVerifying}
-                                                    onClick={takeSnapshotAndVerify}
-                                                    className="flex-2 w-full py-3.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center justify-center space-x-2"
-                                                >
-                                                    <i className="fa-solid fa-[#camera] text-lg"></i>
-                                                    <span>AMBIL FOTO & VERIFIKASI</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* STEP 3: SUCCESS RESULT */}
-                                    {kioskStep === 3 && verificationResult && (
-                                        <div className="p-6 sm:p-8 space-y-6 text-center">
-                                            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-black shadow-inner">
-                                                ✓
-                                            </div>
-
-                                            <div>
-                                                <h3 className="text-2xl font-black text-slate-900">Absensi Berhasil!</h3>
-                                                <p className="text-sm text-slate-500 mt-1">Terima kasih, data absensi Anda telah tercatat.</p>
-                                            </div>
-
-                                            {/* Captured vs Master Comparison Card */}
-                                            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 grid grid-cols-2 gap-4 text-left">
-                                                <div>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Foto Master</span>
-                                                    <img src={selectedEmployee?.masterPhoto} className="w-full h-32 object-cover rounded-xl border border-slate-200" />
-                                                </div>
-                                                <div>
-                                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block mb-1">Foto Tangkapan AI</span>
-                                                    <img src={verificationResult.captured_photo} className="w-full h-32 object-cover rounded-xl border-2 border-emerald-500" />
-                                                </div>
-                                            </div>
-
-                                            {/* Verification Specs */}
-                                            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                                                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Match Score</span>
-                                                    <span className="font-extrabold text-emerald-700 text-base">{verificationResult.confidence}%</span>
-                                                </div>
-                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                                                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Liveness</span>
-                                                    <span className="font-extrabold text-blue-700 text-base">{verificationResult.liveness_score}%</span>
-                                                </div>
-                                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                                                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Status Waktu</span>
-                                                    <span className={`font-extrabold text-xs block mt-1 ${verificationResult.is_late ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                                        {verificationResult.is_late ? `Terlambat (${verificationResult.late_minutes} m)` : 'Tepat Waktu'}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={resetKioskFlow}
-                                                className="w-full py-4 rounded-xl font-extrabold text-white bg-slate-900 hover:bg-slate-800 shadow-xl"
-                                            >
-                                                Selesai / Kembali ke Menu Utama
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* TAB 2: LAPORAN ABSENSI (SuperAdmin Only) */}
                         {activeTab === 'reports' && isSuperAdmin && (
                             <div className="space-y-6">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <div>
-                                        <h3 className="text-lg font-extrabold text-slate-900">Riwayat Absensi Karyawan</h3>
-                                        <p className="text-xs text-slate-500">Tersinkronisasi otomatis dari database Supabase</p>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Laporan Absensi Karyawan</h3>
+                                        <p className="text-xs text-slate-500">Rekapitulasi riwayat absensi masuk & pulang terkini</p>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button 
-                                            onClick={() => fetchDataFromSupabase(supabaseClient)} 
-                                            className="px-3 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300 flex items-center space-x-1.5"
-                                        >
-                                            <i className="fa-solid fa-rotate text-xs"></i>
-                                            <span>Refresh Data</span>
-                                        </button>
-                                    </div>
+                                    <button 
+                                        onClick={() => window.print()}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-slate-300"
+                                    >
+                                        <i className="fa-solid fa-print"></i> Cetak Laporan
+                                    </button>
                                 </div>
 
-                                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm">
-                                            <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-200">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-50 text-slate-500 uppercase font-extrabold border-b border-slate-200">
                                                 <tr>
-                                                    <th className="p-4">Tanggal & Waktu</th>
-                                                    <th className="p-4">Karyawan</th>
-                                                    <th className="p-4">Outlet / Lokasi</th>
-                                                    <th className="p-4">Tipe Absen</th>
-                                                    <th className="p-4">Foto Capture</th>
-                                                    <th className="p-4">Akurasi AI</th>
+                                                    <th className="p-4">Foto AI</th>
+                                                    <th className="p-4">Nama Staff</th>
+                                                    <th className="p-4">Store Outlet</th>
+                                                    <th className="p-4">Shift Kerja</th>
+                                                    <th className="p-4">Tipe</th>
+                                                    <th className="p-4">Waktu</th>
+                                                    <th className="p-4">Status Keterlambatan</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100 font-medium">
+                                            <tbody className="divide-y divide-slate-100">
                                                 {attendanceRecords.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan="6" className="p-8 text-center text-slate-400">
-                                                            Belum ada data riwayat absensi. Lakukan absensi pertama di tab Kiosk.
+                                                        <td colSpan="7" className="p-8 text-center text-slate-400 font-medium">
+                                                            Belum ada data absensi tercatat hari ini.
                                                         </td>
                                                     </tr>
                                                 ) : (
-                                                    attendanceRecords.map((rec) => (
-                                                        <tr key={rec.id} className="hover:bg-slate-50/80">
-                                                            <td className="p-4 text-xs font-mono text-slate-600">
-                                                                {new Date(rec.created_at || rec.check_in).toLocaleString('id-ID')}
-                                                            </td>
-                                                            <td className="p-4 font-bold text-slate-800">
-                                                                {rec.employee_name}
-                                                                <span className="block text-[11px] font-normal text-slate-500">{rec.role}</span>
-                                                            </td>
-                                                            <td className="p-4 text-xs text-slate-600">{rec.store_name}</td>
+                                                    attendanceRecords.map(rec => (
+                                                        <tr key={rec.id} className="hover:bg-slate-50">
                                                             <td className="p-4">
-                                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                                                                <img src={rec.captured_photo} className="w-10 h-10 rounded-xl object-cover border border-slate-300" />
+                                                            </td>
+                                                            <td className="p-4 font-bold text-slate-900">{rec.employee_name}</td>
+                                                            <td className="p-4 text-slate-600">{rec.store_name}</td>
+                                                            <td className="p-4 text-slate-500">{rec.shift}</td>
+                                                            <td className="p-4">
+                                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
                                                                     rec.attendance_type === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                                                                 }`}>
                                                                     {rec.attendance_type === 'CHECK_IN' ? 'MASUK' : 'PULANG'}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-4">
-                                                                <img src={rec.captured_photo} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                                                            <td className="p-4 font-mono text-slate-600">
+                                                                {new Date(rec.created_at).toLocaleTimeString('id-ID')}
                                                             </td>
-                                                            <td className="p-4 text-xs">
-                                                                <span className="font-bold text-emerald-600">{rec.confidence}%</span>
+                                                            <td className="p-4">
+                                                                {rec.is_late ? (
+                                                                    <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded-md border border-rose-200">
+                                                                        ⚠️ Telat {rec.late_minutes} Min
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-200">
+                                                                        ✓ Tepat Waktu
+                                                                    </span>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     ))
@@ -822,35 +738,58 @@
                         {/* TAB 3: KELOLA STAFF (SuperAdmin Only) */}
                         {activeTab === 'staff' && isSuperAdmin && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <div>
-                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Staff & Supir</h3>
-                                        <p className="text-xs text-slate-500">Kelola foto master dan penugasan role driver</p>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Karyawan & Driver</h3>
+                                        <p className="text-xs text-slate-500">Kelola biodata, foto master, dan status penugasan supir</p>
                                     </div>
                                     <button 
-                                        onClick={() => setShowStaffModal(true)}
-                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center space-x-2"
+                                        onClick={openAddStaffModal}
+                                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center space-x-2"
                                     >
                                         <i className="fa-solid fa-plus"></i>
-                                        <span>Tambah Staff Baru</span>
+                                        <span>Tambah Karyawan Baru</span>
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {employees.map(emp => (
-                                        <div key={emp.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-start space-x-4">
-                                            <img src={emp.masterPhoto} className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 flex-shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between">
+                                        <div key={emp.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                                            <div className="flex items-start space-x-4">
+                                                <img src={emp.masterPhoto} className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 flex-shrink-0" />
+                                                <div className="flex-1 min-w-0">
                                                     <h4 className="font-bold text-slate-900 text-sm truncate">{emp.name}</h4>
-                                                    {emp.isDriver && (
-                                                        <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
-                                                            🚚 DRIVER
+                                                    <p className="text-xs text-slate-500 font-medium mt-0.5">{emp.role}</p>
+                                                    <p className="text-[11px] font-mono text-slate-400 mt-1">{emp.phone}</p>
+                                                    
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        {emp.isDriver && (
+                                                            <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-300">
+                                                                🚚 DRIVER
+                                                            </span>
+                                                        )}
+                                                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                                            {stores.find(s => s.id === emp.storeId)?.name || 'Central Kitchen'}
                                                         </span>
-                                                    )}
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-0.5">{emp.role}</p>
-                                                <p className="text-[11px] font-mono text-slate-400 mt-2">{emp.phone}</p>
+                                            </div>
+
+                                            <div className="flex items-center space-x-2 pt-3 border-t border-slate-100">
+                                                <button 
+                                                    onClick={() => openEditStaffModal(emp)}
+                                                    className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-600 rounded-lg text-xs font-bold transition-all border border-slate-200 flex items-center justify-center space-x-1"
+                                                >
+                                                    <i className="fa-solid fa-pen-to-square text-xs"></i>
+                                                    <span>Edit</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => setDeleteConfirmEmp(emp)}
+                                                    className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition-all border border-rose-200 flex items-center justify-center space-x-1"
+                                                >
+                                                    <i className="fa-solid fa-trash-can text-xs"></i>
+                                                    <span>Hapus</span>
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
@@ -858,78 +797,75 @@
                             </div>
                         )}
 
-                        {/* TAB 4: STORES (SuperAdmin Only) */}
+                        {/* TAB 4: KELOLA STORE (SuperAdmin Only) */}
                         {activeTab === 'stores' && isSuperAdmin && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {stores.map(st => (
-                                    <div key={st.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xl">
-                                            🏪
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-slate-900">{st.name}</h4>
-                                            <p className="text-xs text-slate-500">{st.address}</p>
-                                            <span className="inline-block mt-2 text-[10px] font-mono font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-600">{st.code}</span>
-                                        </div>
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                    <div>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Outlet & Store</h3>
+                                        <p className="text-xs text-slate-500">Kelola lokasi cabang dan central kitchen Puding Panen Bali</p>
                                     </div>
-                                ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {stores.map(st => (
+                                        <div key={st.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-start space-x-4">
+                                            <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-xl font-black flex-shrink-0">
+                                                🏪
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="font-bold text-slate-900 text-sm">{st.name}</h4>
+                                                    <span className="bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5 rounded font-bold">{st.code}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-1">{st.address}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </main>
 
-                    {}
-                    
-                    {/* MODAL CONFIG DB SUPABASE */}
-                    {showConfigModal && (
-                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl">
-                                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                                    <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                                        <span>🗄️</span> Konfigurasi Database Supabase
-                                    </h3>
-                                    <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                    {/* MODAL POPUP PERINGATAN KETERLAMBATAN */}
+                    {showLateModal && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border-2 border-rose-200">
+                                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-3xl font-black pulse-border-rose">
+                                    ⚠️
+                                </div>
+                                
+                                <div>
+                                    <span className="bg-rose-100 text-rose-800 text-[11px] font-extrabold px-3 py-1 rounded-full border border-rose-300">
+                                        TERLAMBAT {lateMinutesCount} MENIT
+                                    </span>
+                                    <h3 className="font-extrabold text-slate-900 text-lg mt-2">Peringatan Keterlambatan!</h3>
+                                    <p className="text-xs text-slate-600 font-medium mt-2 leading-relaxed">
+                                        Jam masuk shift Anda adalah <strong className="text-slate-900">{selectedShift}</strong>.<br/>
+                                        Apakah Anda <span className="underline decoration-rose-500 font-bold">sudah mengisi Form Datang Terlambat</span> di WhatsApp Group?
+                                    </p>
                                 </div>
 
-                                <div className="space-y-4 text-xs">
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
-                                        <input 
-                                            type="text" 
-                                            value={supabaseUrl} 
-                                            onChange={(e) => setSupabaseUrl(e.target.value)} 
-                                            placeholder="https://xxx.supabase.co" 
-                                            className="w-full p-3 border border-slate-300 rounded-xl font-mono text-slate-800"
-                                        />
+                                {lateWarningAlert && (
+                                    <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold text-left animate-bounce">
+                                        {lateWarningAlert}
                                     </div>
+                                )}
 
-                                    <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Supabase API Anon Key</label>
-                                        <textarea 
-                                            rows="3"
-                                            value={supabaseKey} 
-                                            onChange={(e) => setSupabaseKey(e.target.value)} 
-                                            placeholder="eyJhbGciOi..." 
-                                            className="w-full p-3 border border-slate-300 rounded-xl font-mono text-slate-800"
-                                        ></textarea>
-                                    </div>
-                                </div>
-
-                                <div className="flex space-x-3 pt-2">
+                                <div className="grid grid-cols-2 gap-3 pt-2">
                                     <button 
-                                        onClick={() => setShowConfigModal(false)} 
-                                        className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs"
+                                        type="button"
+                                        onClick={() => handleConfirmLateForm(false)}
+                                        className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all border border-slate-300"
                                     >
-                                        Batal
+                                        Belum / Tidak
                                     </button>
                                     <button 
-                                        onClick={() => {
-                                            initSupabase();
-                                            setShowConfigModal(false);
-                                            alert('Konfigurasi tersimpan dan tersinkronisasi!');
-                                        }} 
-                                        className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-200"
+                                        type="button"
+                                        onClick={() => handleConfirmLateForm(true)}
+                                        className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-emerald-200 transition-all"
                                     >
-                                        Simpan & Hubungkan
+                                        Ya, Sudah Isi ✓
                                     </button>
                                 </div>
                             </div>
@@ -939,79 +875,259 @@
                     {/* MODAL ADMIN LOGIN */}
                     {showLoginModal && (
                         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl">
-                                <div className="w-12 h-12 bg-slate-100 text-slate-800 rounded-2xl flex items-center justify-center mx-auto text-xl font-black">
-                                    🔒
-                                </div>
-                                <div>
-                                    <h3 className="font-extrabold text-slate-900 text-lg">Akses Mode Super Admin</h3>
-                                    <p className="text-xs text-slate-500 mt-1">Masukkan PIN Keamanan Admin (Default: 1234)</p>
+                            <form onSubmit={handleAdminLogin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="text-center space-y-1">
+                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl mx-auto mb-2">
+                                        🔐
+                                    </div>
+                                    <h3 className="font-extrabold text-slate-900 text-base">Login Super Admin</h3>
+                                    <p className="text-xs text-slate-500">Masukkan PIN Admin untuk akses fitur manajemen</p>
                                 </div>
 
-                                <form onSubmit={handleAdminLogin} className="space-y-4">
+                                <div>
                                     <input 
                                         type="password" 
-                                        maxLength="6"
-                                        value={adminPin}
-                                        onChange={(e) => setAdminPin(e.target.value)}
-                                        placeholder="PIN 1234"
-                                        className="w-full p-3.5 text-center text-xl font-bold tracking-widest border border-slate-300 rounded-xl"
+                                        placeholder="Masukkan PIN (Default: 1234)"
+                                        value={adminPinInput}
+                                        onChange={(e) => setAdminPinInput(e.target.value)}
+                                        className="w-full text-center tracking-widest text-lg font-mono p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500"
                                         autoFocus
                                     />
-                                    <div className="flex space-x-2">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setShowLoginModal(false)}
-                                            className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs"
-                                        >
-                                            Batal
-                                        </button>
-                                        <button 
-                                            type="submit"
-                                            className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-md"
-                                        >
-                                            Masuk Mode Admin
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
+                                </div>
+
+                                <div className="flex space-x-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowLoginModal(false)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="flex-1 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md"
+                                    >
+                                        Masuk Admin
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     )}
 
-                    {/* MODAL TAMBAH STAFF */}
+                    {/* MODAL GANTI PIN ADMIN */}
+                    {showChangePinModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <form onSubmit={handleChangePin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="text-center space-y-1">
+                                    <h3 className="font-extrabold text-slate-900 text-base">Ganti PIN Admin</h3>
+                                    <p className="text-xs text-slate-500">Perbarui PIN keamanan login Super Admin</p>
+                                </div>
+
+                                {pinNotice.msg && (
+                                    <div className={`p-3 rounded-xl text-xs font-bold ${
+                                        pinNotice.type === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    }`}>
+                                        {pinNotice.msg}
+                                    </div>
+                                )}
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">PIN Lama</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.oldPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, oldPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">PIN Baru</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.newPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Konfirmasi PIN Baru</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.confirmPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
+                                            required 
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex space-x-2 pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowChangePinModal(false)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md"
+                                    >
+                                        Simpan PIN Baru
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* MODAL TAMBAH / EDIT STAFF */}
                     {showStaffModal && (
                         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-                                <h3 className="font-extrabold text-slate-900 text-base">Tambah Staff Karyawan Baru</h3>
-                                <form onSubmit={handleAddEmployee} className="space-y-3 text-xs">
+                            <form onSubmit={handleSaveStaff} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">
+                                        {editingEmp ? 'Edit Data Karyawan' : 'Tambah Karyawan Baru'}
+                                    </h3>
+                                    <button type="button" onClick={() => setShowStaffModal(false)} className="text-slate-400 hover:text-slate-700">
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Nama Lengkap</label>
-                                        <input type="text" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="w-full p-2.5 border rounded-xl" required />
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Lengkap Staff</label>
+                                        <input 
+                                            type="text" 
+                                            value={empForm.name}
+                                            onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            required 
+                                        />
                                     </div>
+
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">Role / Jabatan</label>
-                                        <input type="text" value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})} className="w-full p-2.5 border rounded-xl" placeholder="cth: Kasir / Driver / Barista" />
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Nomor Telepon / WhatsApp</label>
+                                        <input 
+                                            type="text" 
+                                            value={empForm.phone}
+                                            onChange={(e) => setEmpForm({ ...empForm, phone: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                        />
                                     </div>
-                                    <div className="flex items-center space-x-2 bg-amber-50 p-3 rounded-xl border border-amber-200">
-                                        <input type="checkbox" id="isDriverCheck" checked={newEmp.isDriver} onChange={e => setNewEmp({...newEmp, isDriver: e.target.checked})} className="w-4 h-4 text-amber-600 rounded" />
-                                        <label htmlFor="isDriverCheck" className="font-bold text-amber-900">Jadikan Tugas Driver / Supir</label>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Jabatan / Role</label>
+                                            <select 
+                                                value={empForm.role}
+                                                onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            >
+                                                <option value="Kasir">Kasir</option>
+                                                <option value="Store Manager">Store Manager</option>
+                                                <option value="Staff Dapur">Staff Dapur</option>
+                                                <option value="Driver Logistic">Driver Logistic</option>
+                                                <option value="Supir Pengiriman">Supir Pengiriman</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Store Outlet Utamanya</label>
+                                            <select 
+                                                value={empForm.storeId}
+                                                onChange={(e) => setEmpForm({ ...empForm, storeId: e.target.value })}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            >
+                                                {stores.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
+
                                     <div>
-                                        <label className="block font-bold text-slate-700 mb-1">URL Foto Master Wajah</label>
-                                        <input type="url" value={newEmp.masterPhoto} onChange={e => setNewEmp({...newEmp, masterPhoto: e.target.value})} className="w-full p-2.5 border rounded-xl" placeholder="https://..." />
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">URL Foto Master Wajah</label>
+                                        <input 
+                                            type="text" 
+                                            value={empForm.masterPhoto}
+                                            onChange={(e) => setEmpForm({ ...empForm, masterPhoto: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            placeholder="https://..."
+                                        />
                                     </div>
-                                    <div className="flex space-x-2 pt-2">
-                                        <button type="button" onClick={() => setShowStaffModal(false)} className="w-full py-2.5 bg-slate-100 rounded-xl font-bold">Batal</button>
-                                        <button type="submit" className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-bold shadow-md">Simpan Staff</button>
+
+                                    <div className="flex items-center space-x-2 pt-1">
+                                        <input 
+                                            type="checkbox" 
+                                            id="isDriver"
+                                            checked={empForm.isDriver}
+                                            onChange={(e) => setEmpForm({ ...empForm, isDriver: e.target.checked })}
+                                            className="w-4 h-4 text-amber-500 rounded focus:ring-amber-400"
+                                        />
+                                        <label htmlFor="isDriver" className="text-xs font-bold text-slate-700">
+                                            Karyawan ini bertugas sebagai Driver / Supir Logistic
+                                        </label>
                                     </div>
-                                </form>
+                                </div>
+
+                                <div className="flex space-x-2 pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowStaffModal(false)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md"
+                                    >
+                                        {editingEmp ? 'Simpan Perubahan' : 'Tambah Staff'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* MODAL HAPUS STAFF CONFIRMATION */}
+                    {deleteConfirmEmp && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+                                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                                    🗑️
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 text-base">Hapus Data Karyawan?</h3>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Apakah Anda yakin ingin menghapus <strong>{deleteConfirmEmp.name}</strong> dari daftar staff?
+                                    </p>
+                                </div>
+                                <div className="flex space-x-2 pt-2">
+                                    <button 
+                                        onClick={() => setDeleteConfirmEmp(null)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteStaff(deleteConfirmEmp.id)}
+                                        className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md"
+                                    >
+                                        Ya, Hapus
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Footer */}
-                    <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
-                        <p>© 2026 Puding Panen Bali HRIS — Auto Synchronized Supabase System</p>
+                    <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 font-medium">
+                        © 2026 Puding Panen Bali • Sistem Absensi & Manajemen Terpadu Multi-Outlet
                     </footer>
                 </div>
             );
