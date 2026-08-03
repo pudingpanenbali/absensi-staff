@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Puding Panen Bali - Sistem Absensi & Management</title>
+    <title>Puding Panen Bali - Sistem Absensi & Manajemen Multi-Outlet</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -87,6 +87,14 @@
             { id: 'EMP004', name: 'Ketut Budi', phone: '082111222333', role: 'Supir Pengiriman', storeId: 'S4', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: true, masterPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80' }
         ];
 
+        const INITIAL_ROLES = [
+            'Store Manager',
+            'Kasir',
+            'Staff Dapur',
+            'Driver Logistic',
+            'Supir Pengiriman'
+        ];
+
         function App() {
             const [activeTab, setActiveTab] = useState('kiosk');
             const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -109,6 +117,7 @@
             // Application Data States
             const [stores, setStores] = useState(INITIAL_STORES);
             const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
+            const [roles, setRoles] = useState(INITIAL_ROLES);
             const [attendanceRecords, setAttendanceRecords] = useState([]);
 
             // Kiosk Selection Flow States
@@ -130,11 +139,11 @@
             const [isVerifying, setIsVerifying] = useState(false);
             const [verificationResult, setVerificationResult] = useState(null);
 
-            // Staff Management Modal States
+            // Staff Management Modal & Photo Source States
             const [showStaffModal, setShowStaffModal] = useState(false);
             const [editingEmp, setEditingEmp] = useState(null);
             const [deleteConfirmEmp, setDeleteConfirmEmp] = useState(null);
-            const [staffNotice, setStaffNotice] = useState('');
+            const [photoSourceType, setPhotoSourceType] = useState('file'); // 'file' or 'url'
             const [empForm, setEmpForm] = useState({
                 name: '', phone: '', role: 'Kasir', storeId: 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: ''
             });
@@ -144,6 +153,12 @@
             const [editingStore, setEditingStore] = useState(null);
             const [deleteConfirmStore, setDeleteConfirmStore] = useState(null);
             const [storeForm, setStoreForm] = useState({ code: '', name: '', address: '' });
+
+            // Jabatan Management Modal States
+            const [showRoleModal, setShowRoleModal] = useState(false);
+            const [editingRoleIndex, setEditingRoleIndex] = useState(null);
+            const [deleteConfirmRole, setDeleteConfirmRole] = useState(null);
+            const [roleForm, setRoleForm] = useState({ oldName: '', name: '' });
 
             const videoRef = useRef(null);
             const canvasRef = useRef(null);
@@ -337,14 +352,31 @@
 
             const openAddStaffModal = () => {
                 setEditingEmp(null);
-                setEmpForm({ name: '', phone: '', role: 'Kasir', storeId: stores[0]?.id || 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80' });
+                setPhotoSourceType('file');
+                setEmpForm({ name: '', phone: '', role: roles[0] || 'Kasir', storeId: stores[0]?.id || 'S1', shift: 'Shift Pagi (07:00 - 15:00)', isDriver: false, masterPhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80' });
                 setShowStaffModal(true);
             };
 
             const openEditStaffModal = (emp) => {
                 setEditingEmp(emp);
+                setPhotoSourceType('url');
                 setEmpForm({ name: emp.name, phone: emp.phone, role: emp.role, storeId: emp.storeId, shift: emp.shift, isDriver: emp.isDriver, masterPhoto: emp.masterPhoto });
                 setShowStaffModal(true);
+            };
+
+            const handlePhotoFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('Ukuran file foto terlalu besar! Maksimal 5MB.');
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setEmpForm(prev => ({ ...prev, masterPhoto: reader.result }));
+                    };
+                    reader.readAsDataURL(file);
+                }
             };
 
             const handleSaveStaff = (e) => {
@@ -365,9 +397,75 @@
                 setDeleteConfirmEmp(null);
             };
 
+            const openAddStoreModal = () => {
+                setEditingStore(null);
+                setStoreForm({ code: `OUT-0${stores.length + 1}`, name: '', address: '' });
+                setShowStoreModal(true);
+            };
+
+            const openEditStoreModal = (st) => {
+                setEditingStore(st);
+                setStoreForm({ code: st.code, name: st.name, address: st.address });
+                setShowStoreModal(true);
+            };
+
+            const handleSaveStore = (e) => {
+                e.preventDefault();
+                if (!storeForm.name || !storeForm.code) return;
+
+                if (editingStore) {
+                    setStores(prev => prev.map(s => s.id === editingStore.id ? { ...s, ...storeForm } : s));
+                } else {
+                    const newStore = { id: 'S' + Date.now().toString().slice(-4), ...storeForm };
+                    setStores(prev => [...prev, newStore]);
+                }
+                setShowStoreModal(false);
+            };
+
+            const handleDeleteStore = (stId) => {
+                setStores(prev => prev.filter(s => s.id !== stId));
+                setDeleteConfirmStore(null);
+            };
+
+            const openAddRoleModal = () => {
+                setEditingRoleIndex(null);
+                setRoleForm({ oldName: '', name: '' });
+                setShowRoleModal(true);
+            };
+
+            const openEditRoleModal = (index, roleName) => {
+                setEditingRoleIndex(index);
+                setRoleForm({ oldName: roleName, name: roleName });
+                setShowRoleModal(true);
+            };
+
+            const handleSaveRole = (e) => {
+                e.preventDefault();
+                const trimmed = roleForm.name.trim();
+                if (!trimmed) return;
+
+                if (editingRoleIndex !== null) {
+                    const oldRoleName = roles[editingRoleIndex];
+                    setRoles(prev => prev.map((r, idx) => idx === editingRoleIndex ? trimmed : r));
+                    setEmployees(prev => prev.map(emp => emp.role === oldRoleName ? { ...emp, role: trimmed } : emp));
+                } else {
+                    if (roles.includes(trimmed)) {
+                        alert('Jabatan ini sudah ada dalam daftar!');
+                        return;
+                    }
+                    setRoles(prev => [...prev, trimmed]);
+                }
+                setShowRoleModal(false);
+            };
+
+            const handleDeleteRole = (roleToDelete) => {
+                setRoles(prev => prev.filter(r => r !== roleToDelete));
+                setDeleteConfirmRole(null);
+            };
+
             return (
                 <div className="min-h-screen flex flex-col justify-between">
-                    {/* Header Navbar */}
+                    {}
                     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
                             <div className="flex items-center space-x-3">
@@ -439,7 +537,7 @@
                                 <span>Kiosk Absensi AI</span>
                             </button>
 
-                            {/* Laporan Absensi Restriksi SuperAdmin */}
+                            {/* Restricted Admin Tabs */}
                             {isSuperAdmin && (
                                 <>
                                     <button 
@@ -477,6 +575,18 @@
                                         <i className="fa-solid fa-store"></i>
                                         <span>Kelola Store ({stores.length})</span>
                                     </button>
+
+                                    <button 
+                                        onClick={() => setActiveTab('roles')}
+                                        className={`py-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center space-x-2 ${
+                                            activeTab === 'roles' 
+                                                ? 'border-amber-500 text-amber-600' 
+                                                : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-briefcase"></i>
+                                        <span>Kelola Jabatan ({roles.length})</span>
+                                    </button>
                                 </>
                             )}
                         </div>
@@ -484,7 +594,7 @@
 
                     {/* Main Content Body */}
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
-                        {/* TAB 1: KIOSK ABSENSI */}
+                        {}
                         {activeTab === 'kiosk' && (
                             <div className="max-w-xl mx-auto space-y-6">
                                 {kioskStep === 1 && (
@@ -658,133 +768,194 @@
                             </div>
                         )}
 
-                        {/* TAB 2: LAPORAN ABSENSI (SuperAdmin Only) */}
+                        {}
                         {activeTab === 'reports' && isSuperAdmin && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div>
                                         <h3 className="text-lg font-extrabold text-slate-900">Laporan Absensi Karyawan</h3>
-                                        <p className="text-xs text-slate-500">Rekapitulasi riwayat absensi masuk & pulang terkini</p>
+                                        <p className="text-xs text-slate-500">Rekapitulasi riwayat absensi masuk, pulang, dan keterlambatan real-time</p>
                                     </div>
-                                    <button 
-                                        onClick={() => window.print()}
-                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-slate-300"
-                                    >
-                                        <i className="fa-solid fa-print"></i> Cetak Laporan
-                                    </button>
+                                    <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-300">
+                                        Total {attendanceRecords.length} Catatan Absen
+                                    </span>
                                 </div>
 
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-xs">
-                                            <thead className="bg-slate-50 text-slate-500 uppercase font-extrabold border-b border-slate-200">
-                                                <tr>
-                                                    <th className="p-4">Foto AI</th>
-                                                    <th className="p-4">Nama Staff</th>
-                                                    <th className="p-4">Store Outlet</th>
-                                                    <th className="p-4">Shift Kerja</th>
-                                                    <th className="p-4">Tipe</th>
-                                                    <th className="p-4">Waktu</th>
-                                                    <th className="p-4">Status Keterlambatan</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {attendanceRecords.length === 0 ? (
+                                {attendanceRecords.length === 0 ? (
+                                    <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm space-y-3">
+                                        <div className="text-4xl">📋</div>
+                                        <h4 className="font-bold text-slate-800 text-sm">Belum Ada Data Absensi Hari Ini</h4>
+                                        <p className="text-xs text-slate-400">Silakan lakukan absensi terlebih dahulu melalui Kiosk Absensi AI.</p>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-xs text-slate-600">
+                                                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
                                                     <tr>
-                                                        <td colSpan="7" className="p-8 text-center text-slate-400 font-medium">
-                                                            Belum ada data absensi tercatat hari ini.
-                                                        </td>
+                                                        <th className="p-4">Foto AI</th>
+                                                        <th className="p-4">Karyawan & Jabatan</th>
+                                                        <th className="p-4">Store & Shift</th>
+                                                        <th className="p-4">Waktu Absen</th>
+                                                        <th className="p-4">Tipe Absen</th>
+                                                        <th className="p-4">Status Keterlambatan</th>
                                                     </tr>
-                                                ) : (
-                                                    attendanceRecords.map(rec => (
-                                                        <tr key={rec.id} className="hover:bg-slate-50">
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {attendanceRecords.map((rec) => (
+                                                        <tr key={rec.id} className="hover:bg-slate-50 transition-all">
                                                             <td className="p-4">
-                                                                <img src={rec.captured_photo} className="w-10 h-10 rounded-xl object-cover border border-slate-300" />
+                                                                <img src={rec.captured_photo} className="w-10 h-10 rounded-xl object-cover border border-amber-400 shadow-sm" />
                                                             </td>
-                                                            <td className="p-4 font-bold text-slate-900">{rec.employee_name}</td>
-                                                            <td className="p-4 text-slate-600">{rec.store_name}</td>
-                                                            <td className="p-4 text-slate-500">{rec.shift}</td>
+                                                            <td className="p-4 font-bold text-slate-900">
+                                                                {rec.employee_name}
+                                                                <p className="text-[10px] text-slate-400 font-medium">{rec.role}</p>
+                                                            </td>
                                                             <td className="p-4">
-                                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                                                                    rec.attendance_type === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                                                <span className="font-semibold text-slate-800">{rec.store_name}</span>
+                                                                <p className="text-[10px] text-slate-400">{rec.shift}</p>
+                                                            </td>
+                                                            <td className="p-4 font-mono font-medium text-slate-600">
+                                                                {new Date(rec.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WITA
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className={`px-2.5 py-1 rounded-lg font-extrabold text-[10px] ${
+                                                                    rec.attendance_type === 'CHECK_IN' 
+                                                                        ? 'bg-emerald-100 text-emerald-800' 
+                                                                        : 'bg-rose-100 text-rose-800'
                                                                 }`}>
                                                                     {rec.attendance_type === 'CHECK_IN' ? 'MASUK' : 'PULANG'}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-4 font-mono text-slate-600">
-                                                                {new Date(rec.created_at).toLocaleTimeString('id-ID')}
-                                                            </td>
                                                             <td className="p-4">
                                                                 {rec.is_late ? (
-                                                                    <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded-md border border-rose-200">
-                                                                        ⚠️ Telat {rec.late_minutes} Min
+                                                                    <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-rose-200">
+                                                                        ⚠️ Terlambat {rec.late_minutes} Mins
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-200">
+                                                                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-200">
                                                                         ✓ Tepat Waktu
                                                                     </span>
                                                                 )}
                                                             </td>
                                                         </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         )}
 
-                        {/* TAB 3: KELOLA STAFF (SuperAdmin Only) */}
+                        {}
                         {activeTab === 'staff' && isSuperAdmin && (
                             <div className="space-y-6">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <div>
-                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Karyawan & Driver</h3>
-                                        <p className="text-xs text-slate-500">Kelola biodata, foto master, dan status penugasan supir</p>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Kelola Data Karyawan & Staff</h3>
+                                        <p className="text-xs text-slate-500">Tambah, edit, dan atur master foto wajah karyawan Puding Panen Bali</p>
                                     </div>
                                     <button 
                                         onClick={openAddStaffModal}
                                         className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center space-x-2"
                                     >
-                                        <i className="fa-solid fa-plus"></i>
-                                        <span>Tambah Karyawan Baru</span>
+                                        <i className="fa-solid fa-user-plus"></i>
+                                        <span>Tambah Staff Baru</span>
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {employees.map(emp => (
-                                        <div key={emp.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-                                            <div className="flex items-start space-x-4">
-                                                <img src={emp.masterPhoto} className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 flex-shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-slate-900 text-sm truncate">{emp.name}</h4>
-                                                    <p className="text-xs text-slate-500 font-medium mt-0.5">{emp.role}</p>
-                                                    <p className="text-[11px] font-mono text-slate-400 mt-1">{emp.phone}</p>
-                                                    
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        {emp.isDriver && (
-                                                            <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-300">
-                                                                🚚 DRIVER
-                                                            </span>
-                                                        )}
-                                                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                                            {stores.find(s => s.id === emp.storeId)?.name || 'Central Kitchen'}
-                                                        </span>
+                                    {employees.map(emp => {
+                                        const storeObj = stores.find(s => s.id === emp.storeId);
+                                        return (
+                                            <div key={emp.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                                                <div className="flex items-start space-x-3">
+                                                    <img src={emp.masterPhoto} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 flex-shrink-0" />
+                                                    <div className="flex-1 overflow-hidden">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className="font-bold text-slate-900 text-sm truncate">{emp.name}</h4>
+                                                            {emp.isDriver && (
+                                                                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                                                    🚚 Driver
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-emerald-700 font-semibold">{emp.role}</p>
+                                                        <p className="text-[11px] text-slate-500 mt-1">📱 {emp.phone}</p>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5">🏪 {storeObj?.name || 'Seminyak'}</p>
                                                     </div>
+                                                </div>
+
+                                                <div className="flex items-center space-x-2 pt-3 border-t border-slate-100">
+                                                    <button 
+                                                        onClick={() => openEditStaffModal(emp)}
+                                                        className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-600 rounded-lg text-xs font-bold transition-all border border-slate-200 flex items-center justify-center space-x-1"
+                                                    >
+                                                        <i className="fa-solid fa-pen-to-square text-xs"></i>
+                                                        <span>Edit Staff</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setDeleteConfirmEmp(emp)}
+                                                        className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition-all border border-rose-200 flex items-center justify-center space-x-1"
+                                                    >
+                                                        <i className="fa-solid fa-trash-can text-xs"></i>
+                                                        <span>Hapus</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {}
+                        {activeTab === 'stores' && isSuperAdmin && (
+                            <div className="space-y-6">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                    <div>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Outlet & Store</h3>
+                                        <p className="text-xs text-slate-500">Tambah, edit, dan kelola lokasi cabang serta central kitchen Puding Panen Bali</p>
+                                    </div>
+                                    <button 
+                                        onClick={openAddStoreModal}
+                                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-200 flex items-center space-x-2"
+                                    >
+                                        <i className="fa-solid fa-plus"></i>
+                                        <span>Tambah Store Baru</span>
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {stores.map(st => (
+                                        <div key={st.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                                            <div className="flex items-start space-x-4">
+                                                <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-xl font-black flex-shrink-0">
+                                                    🏪
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="font-bold text-slate-900 text-sm">{st.name}</h4>
+                                                        <span className="bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5 rounded font-bold">{st.code}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 mt-1">{st.address}</p>
+                                                    <p className="text-[11px] text-slate-400 mt-2">
+                                                        Total Staff: <strong>{employees.filter(e => e.storeId === st.id).length} Karyawan</strong>
+                                                    </p>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center space-x-2 pt-3 border-t border-slate-100">
                                                 <button 
-                                                    onClick={() => openEditStaffModal(emp)}
+                                                    onClick={() => openEditStoreModal(st)}
                                                     className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-600 rounded-lg text-xs font-bold transition-all border border-slate-200 flex items-center justify-center space-x-1"
                                                 >
                                                     <i className="fa-solid fa-pen-to-square text-xs"></i>
-                                                    <span>Edit</span>
+                                                    <span>Edit Store</span>
                                                 </button>
                                                 <button 
-                                                    onClick={() => setDeleteConfirmEmp(emp)}
+                                                    onClick={() => setDeleteConfirmStore(st)}
                                                     className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition-all border border-rose-200 flex items-center justify-center space-x-1"
                                                 >
                                                     <i className="fa-solid fa-trash-can text-xs"></i>
@@ -797,195 +968,103 @@
                             </div>
                         )}
 
-                        {/* TAB 4: KELOLA STORE (SuperAdmin Only) */}
-                        {activeTab === 'stores' && isSuperAdmin && (
+                        {}
+                        {activeTab === 'roles' && isSuperAdmin && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                     <div>
-                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Outlet & Store</h3>
-                                        <p className="text-xs text-slate-500">Kelola lokasi cabang dan central kitchen Puding Panen Bali</p>
+                                        <h3 className="text-lg font-extrabold text-slate-900">Daftar Jabatan / Posisi Kerja</h3>
+                                        <p className="text-xs text-slate-500">Kelola master jabatan karyawan untuk penugasan dan hak akses</p>
                                     </div>
+                                    <button 
+                                        onClick={openAddRoleModal}
+                                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center space-x-2"
+                                    >
+                                        <i className="fa-solid fa-plus"></i>
+                                        <span>Tambah Jabatan Baru</span>
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {stores.map(st => (
-                                        <div key={st.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-start space-x-4">
-                                            <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center text-xl font-black flex-shrink-0">
-                                                🏪
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between">
-                                                    <h4 className="font-bold text-slate-900 text-sm">{st.name}</h4>
-                                                    <span className="bg-slate-100 text-slate-700 font-mono text-[10px] px-2 py-0.5 rounded font-bold">{st.code}</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {roles.map((r, idx) => {
+                                        const count = employees.filter(e => e.role === r).length;
+                                        return (
+                                            <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-xl flex items-center justify-center text-lg font-black">
+                                                        💼
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-900 text-sm">{r}</h4>
+                                                        <p className="text-xs text-slate-500 mt-0.5">{count} Karyawan Aktif</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-1">{st.address}</p>
+
+                                                <div className="flex items-center space-x-2 pt-3 border-t border-slate-100">
+                                                    <button 
+                                                        onClick={() => openEditRoleModal(idx, r)}
+                                                        className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-lg text-xs font-bold transition-all border border-slate-200 flex items-center justify-center space-x-1"
+                                                    >
+                                                        <i className="fa-solid fa-pen-to-square text-xs"></i>
+                                                        <span>Ubah Nama</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setDeleteConfirmRole(r)}
+                                                        className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition-all border border-rose-200 flex items-center justify-center space-x-1"
+                                                    >
+                                                        <i className="fa-solid fa-trash-can text-xs"></i>
+                                                        <span>Hapus</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL POPUP PERINGATAN KETERLAMBATAN */}
+                    {}
                     {showLateModal && (
-                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border-2 border-rose-200">
-                                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-3xl font-black pulse-border-rose">
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 text-center shadow-2xl">
+                                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-3xl pulse-border-rose">
                                     ⚠️
                                 </div>
-                                
-                                <div>
-                                    <span className="bg-rose-100 text-rose-800 text-[11px] font-extrabold px-3 py-1 rounded-full border border-rose-300">
-                                        TERLAMBAT {lateMinutesCount} MENIT
-                                    </span>
-                                    <h3 className="font-extrabold text-slate-900 text-lg mt-2">Peringatan Keterlambatan!</h3>
-                                    <p className="text-xs text-slate-600 font-medium mt-2 leading-relaxed">
-                                        Jam masuk shift Anda adalah <strong className="text-slate-900">{selectedShift}</strong>.<br/>
-                                        Apakah Anda <span className="underline decoration-rose-500 font-bold">sudah mengisi Form Datang Terlambat</span> di WhatsApp Group?
+                                <div className="space-y-2">
+                                    <h3 className="font-extrabold text-slate-900 text-lg">Anda Terlambat {lateMinutesCount} Menit!</h3>
+                                    <p className="text-xs text-slate-600 font-medium">
+                                        Absen masuk Anda melebihi jam shift kerja. Apakah Anda sudah mengisi <strong className="text-rose-600">Form Datang Terlambat</strong> di WhatsApp Group?
                                     </p>
                                 </div>
 
                                 {lateWarningAlert && (
-                                    <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold text-left animate-bounce">
+                                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold text-left">
                                         {lateWarningAlert}
                                     </div>
                                 )}
 
                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                     <button 
-                                        type="button"
+                                        type="button" 
                                         onClick={() => handleConfirmLateForm(false)}
-                                        className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all border border-slate-300"
+                                        className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
                                     >
                                         Belum / Tidak
                                     </button>
                                     <button 
-                                        type="button"
+                                        type="button" 
                                         onClick={() => handleConfirmLateForm(true)}
-                                        className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-lg shadow-emerald-200 transition-all"
+                                        className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all"
                                     >
-                                        Ya, Sudah Isi ✓
+                                        Ya, Sudah Isi
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL ADMIN LOGIN */}
-                    {showLoginModal && (
-                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <form onSubmit={handleAdminLogin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-                                <div className="text-center space-y-1">
-                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl mx-auto mb-2">
-                                        🔐
-                                    </div>
-                                    <h3 className="font-extrabold text-slate-900 text-base">Login Super Admin</h3>
-                                    <p className="text-xs text-slate-500">Masukkan PIN Admin untuk akses fitur manajemen</p>
-                                </div>
-
-                                <div>
-                                    <input 
-                                        type="password" 
-                                        placeholder="Masukkan PIN (Default: 1234)"
-                                        value={adminPinInput}
-                                        onChange={(e) => setAdminPinInput(e.target.value)}
-                                        className="w-full text-center tracking-widest text-lg font-mono p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500"
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div className="flex space-x-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setShowLoginModal(false)}
-                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
-                                    >
-                                        Batal
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="flex-1 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md"
-                                    >
-                                        Masuk Admin
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
-                    {/* MODAL GANTI PIN ADMIN */}
-                    {showChangePinModal && (
-                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <form onSubmit={handleChangePin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-                                <div className="text-center space-y-1">
-                                    <h3 className="font-extrabold text-slate-900 text-base">Ganti PIN Admin</h3>
-                                    <p className="text-xs text-slate-500">Perbarui PIN keamanan login Super Admin</p>
-                                </div>
-
-                                {pinNotice.msg && (
-                                    <div className={`p-3 rounded-xl text-xs font-bold ${
-                                        pinNotice.type === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    }`}>
-                                        {pinNotice.msg}
-                                    </div>
-                                )}
-
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">PIN Lama</label>
-                                        <input 
-                                            type="password" 
-                                            value={pinForm.oldPin}
-                                            onChange={(e) => setPinForm({ ...pinForm, oldPin: e.target.value })}
-                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">PIN Baru</label>
-                                        <input 
-                                            type="password" 
-                                            value={pinForm.newPin}
-                                            onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
-                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
-                                            required 
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Konfirmasi PIN Baru</label>
-                                        <input 
-                                            type="password" 
-                                            value={pinForm.confirmPin}
-                                            onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
-                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center font-mono text-sm"
-                                            required 
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex space-x-2 pt-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setShowChangePinModal(false)}
-                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
-                                    >
-                                        Batal
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md"
-                                    >
-                                        Simpan PIN Baru
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
-                    {/* MODAL TAMBAH / EDIT STAFF */}
+                    {}
                     {showStaffModal && (
                         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <form onSubmit={handleSaveStaff} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -993,9 +1072,7 @@
                                     <h3 className="font-extrabold text-slate-900 text-base">
                                         {editingEmp ? 'Edit Data Karyawan' : 'Tambah Karyawan Baru'}
                                     </h3>
-                                    <button type="button" onClick={() => setShowStaffModal(false)} className="text-slate-400 hover:text-slate-700">
-                                        ✕
-                                    </button>
+                                    <button type="button" onClick={() => setShowStaffModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
                                 </div>
 
                                 <div className="space-y-3">
@@ -1028,11 +1105,9 @@
                                                 onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}
                                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
                                             >
-                                                <option value="Kasir">Kasir</option>
-                                                <option value="Store Manager">Store Manager</option>
-                                                <option value="Staff Dapur">Staff Dapur</option>
-                                                <option value="Driver Logistic">Driver Logistic</option>
-                                                <option value="Supir Pengiriman">Supir Pengiriman</option>
+                                                {roles.map((r, i) => (
+                                                    <option key={i} value={r}>{r}</option>
+                                                ))}
                                             </select>
                                         </div>
 
@@ -1051,14 +1126,57 @@
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">URL Foto Master Wajah</label>
-                                        <input 
-                                            type="text" 
-                                            value={empForm.masterPhoto}
-                                            onChange={(e) => setEmpForm({ ...empForm, masterPhoto: e.target.value })}
-                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
-                                            placeholder="https://..."
-                                        />
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Foto Master Wajah</label>
+                                        
+                                        <div className="flex space-x-2 mb-2 p-1 bg-slate-100 rounded-xl border border-slate-200 text-[11px] font-bold">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setPhotoSourceType('file')}
+                                                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                                                    photoSourceType === 'file' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                                                }`}
+                                            >
+                                                <i className="fa-solid fa-laptop"></i>
+                                                <span>Upload Komputer / HP</span>
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setPhotoSourceType('url')}
+                                                className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                                                    photoSourceType === 'url' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                                                }`}
+                                            >
+                                                <i className="fa-solid fa-link"></i>
+                                                <span>Link URL Web</span>
+                                            </button>
+                                        </div>
+
+                                        {photoSourceType === 'file' ? (
+                                            <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:bg-slate-50 transition-all cursor-pointer">
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*"
+                                                    onChange={handlePhotoFileUpload}
+                                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                                                />
+                                                <p className="text-[10px] text-slate-400 mt-1">Format JPG, PNG, atau WEBP (Maksimal 5MB)</p>
+                                            </div>
+                                        ) : (
+                                            <input 
+                                                type="text" 
+                                                value={empForm.masterPhoto}
+                                                onChange={(e) => setEmpForm({ ...empForm, masterPhoto: e.target.value })}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                                placeholder="https://images.unsplash.com/..."
+                                            />
+                                        )}
+
+                                        {empForm.masterPhoto && (
+                                            <div className="mt-2 flex items-center space-x-3 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                                                <img src={empForm.masterPhoto} className="w-12 h-12 rounded-xl object-cover border border-amber-400" />
+                                                <span className="text-[11px] text-slate-500 font-medium">Preview Foto Terpasang</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center space-x-2 pt-1">
@@ -1094,32 +1212,300 @@
                         </div>
                     )}
 
-                    {/* MODAL HAPUS STAFF CONFIRMATION */}
-                    {deleteConfirmEmp && (
+                    {}
+                    {showStoreModal && (
                         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-                                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
-                                    🗑️
+                            <form onSubmit={handleSaveStore} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">
+                                        {editingStore ? 'Edit Data Store' : 'Tambah Store / Outlet Baru'}
+                                    </h3>
+                                    <button type="button" onClick={() => setShowStoreModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
                                 </div>
-                                <div>
-                                    <h3 className="font-extrabold text-slate-900 text-base">Hapus Data Karyawan?</h3>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        Apakah Anda yakin ingin menghapus <strong>{deleteConfirmEmp.name}</strong> dari daftar staff?
-                                    </p>
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Kode Store / Outlet</label>
+                                        <input 
+                                            type="text" 
+                                            value={storeForm.code}
+                                            onChange={(e) => setStoreForm({ ...storeForm, code: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
+                                            placeholder="OUT-05"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Store / Cabang</label>
+                                        <input 
+                                            type="text" 
+                                            value={storeForm.name}
+                                            onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            placeholder="Outlet Sanur"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Alamat Lengkap</label>
+                                        <textarea 
+                                            value={storeForm.address}
+                                            onChange={(e) => setStoreForm({ ...storeForm, address: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                            rows="2"
+                                            placeholder="Jl. Danau Toba No. 99, Sanur"
+                                        ></textarea>
+                                    </div>
                                 </div>
+
                                 <div className="flex space-x-2 pt-2">
                                     <button 
-                                        onClick={() => setDeleteConfirmEmp(null)}
-                                        className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                                        type="button" 
+                                        onClick={() => setShowStoreModal(false)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
                                     >
                                         Batal
                                     </button>
                                     <button 
-                                        onClick={() => handleDeleteStaff(deleteConfirmEmp.id)}
-                                        className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md"
+                                        type="submit" 
+                                        className="flex-1 py-2.5 bg-amber-500 text-white font-bold text-xs rounded-xl shadow-md"
                                     >
-                                        Ya, Hapus
+                                        Simpan Store
                                     </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {}
+                    {showRoleModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <form onSubmit={handleSaveRole} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">
+                                        {editingRoleIndex !== null ? 'Ubah Nama Jabatan' : 'Tambah Jabatan Baru'}
+                                    </h3>
+                                    <button type="button" onClick={() => setShowRoleModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Jabatan / Posisi</label>
+                                    <input 
+                                        type="text" 
+                                        value={roleForm.name}
+                                        onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold"
+                                        placeholder="Contoh: Barista / Pastry Chef"
+                                        required 
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="flex space-x-2 pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowRoleModal(false)}
+                                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md"
+                                    >
+                                        Simpan Jabatan
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {}
+                    {showLoginModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <form onSubmit={handleAdminLogin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">Login Super Admin</h3>
+                                    <button type="button" onClick={() => setShowLoginModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">PIN Admin Security</label>
+                                    <input 
+                                        type="password" 
+                                        value={adminPinInput}
+                                        onChange={(e) => setAdminPinInput(e.target.value)}
+                                        className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-center text-lg tracking-widest font-bold"
+                                        placeholder="****"
+                                        maxLength="6"
+                                        required
+                                        autoFocus
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1.5 text-center">Standard PIN awal: 1234</p>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                                >
+                                    Masuk Ke Panel Admin
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {showChangePinModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <form onSubmit={handleChangePin} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">Ganti PIN Super Admin</h3>
+                                    <button type="button" onClick={() => setShowChangePinModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                                </div>
+
+                                {pinNotice.msg && (
+                                    <div className={`p-2.5 rounded-xl text-xs font-bold ${
+                                        pinNotice.type === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    }`}>
+                                        {pinNotice.msg}
+                                    </div>
+                                )}
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">PIN Saat Ini</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.oldPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, oldPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">PIN Baru (Minimal 4 Angka)</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.newPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                                            required 
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Konfirmasi PIN Baru</label>
+                                        <input 
+                                            type="password" 
+                                            value={pinForm.confirmPin}
+                                            onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold"
+                                            required 
+                                        />
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                                >
+                                    Perbarui PIN Admin
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {}
+                    {showConfigModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base">Konfigurasi Database Supabase</h3>
+                                    <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Project URL</label>
+                                        <input 
+                                            type="text" 
+                                            value={supabaseUrl}
+                                            onChange={(e) => setSupabaseUrl(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-medium"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 mb-1">API Anon Key</label>
+                                        <textarea 
+                                            value={supabaseKey}
+                                            onChange={(e) => setSupabaseKey(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-medium"
+                                            rows="3"
+                                        ></textarea>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => {
+                                        localStorage.setItem('SUPABASE_URL', supabaseUrl);
+                                        localStorage.setItem('SUPABASE_KEY', supabaseKey);
+                                        setShowConfigModal(false);
+                                    }}
+                                    className="w-full py-3 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md"
+                                >
+                                    Simpan & Hubungkan
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {}
+                    {deleteConfirmEmp && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+                                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">🗑️</div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 text-base">Hapus Karyawan?</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Yakin menghapus <strong>{deleteConfirmEmp.name}</strong>?</p>
+                                </div>
+                                <div className="flex space-x-2 pt-2">
+                                    <button onClick={() => setDeleteConfirmEmp(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Batal</button>
+                                    <button onClick={() => handleDeleteStaff(deleteConfirmEmp.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md">Hapus</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {deleteConfirmStore && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+                                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">🗑️</div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 text-base">Hapus Store?</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Yakin menghapus outlet <strong>{deleteConfirmStore.name}</strong>?</p>
+                                </div>
+                                <div className="flex space-x-2 pt-2">
+                                    <button onClick={() => setDeleteConfirmStore(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Batal</button>
+                                    <button onClick={() => handleDeleteStore(deleteConfirmStore.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md">Hapus</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {deleteConfirmRole && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+                                <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">🗑️</div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 text-base">Hapus Jabatan?</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Yakin menghapus jabatan <strong>{deleteConfirmRole}</strong>?</p>
+                                </div>
+                                <div className="flex space-x-2 pt-2">
+                                    <button onClick={() => setDeleteConfirmRole(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">Batal</button>
+                                    <button onClick={() => handleDeleteRole(deleteConfirmRole)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md">Hapus</button>
                                 </div>
                             </div>
                         </div>
